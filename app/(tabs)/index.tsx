@@ -1,107 +1,146 @@
-import { Image } from "expo-image";
-import { Platform, StyleSheet } from "react-native";
+import { router } from "expo-router";
+import React from "react";
+import { Alert, ScrollView, StyleSheet, Text, View } from "react-native";
 
-import { HelloWave } from "@/components/layout/hello-wave";
-import ParallaxScrollView from "@/components/layout/parallax-scroll-view";
-import { ThemedText } from "@/components/layout/themed-text";
-import { ThemedView } from "@/components/layout/themed-view";
-import { Link } from "expo-router";
+import { ActionCard } from "@/components/common/ActionCard";
+import { SearchBar } from "@/components/common/SearchBar";
+import { Header } from "@/components/layout/Header";
+import { BorderRadius, Colors, Spacing } from "@/constants/theme";
+import { useColorScheme } from "@/hooks/use-color-scheme";
 
 export default function HomeScreen() {
-  return (
-    <ParallaxScrollView
-      headerBackgroundColor={{ light: "#A1CEDC", dark: "#1D3D47" }}
-      headerImage={
-        <Image
-          source={require("@/assets/images/partial-react-logo.png")}
-          style={styles.reactLogo}
-        />
-      }
-    >
-      <ThemedView style={styles.titleContainer}>
-        <ThemedText type="title">Welcome!</ThemedText>
-        <HelloWave />
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <ThemedText type="subtitle">Step 1: Try it</ThemedText>
-        <ThemedText>
-          Edit{" "}
-          <ThemedText type="defaultSemiBold">app/(tabs)/index.tsx</ThemedText>{" "}
-          to see changes. Press{" "}
-          <ThemedText type="defaultSemiBold">
-            {Platform.select({
-              ios: "cmd + d",
-              android: "cmd + m",
-              web: "F12",
-            })}
-          </ThemedText>{" "}
-          to open developer tools.
-        </ThemedText>
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <Link href="/modal">
-          <Link.Trigger>
-            <ThemedText type="subtitle">Step 2: Explore</ThemedText>
-          </Link.Trigger>
-          <Link.Preview />
-          <Link.Menu>
-            <Link.MenuAction
-              title="Action"
-              icon="cube"
-              onPress={() => alert("Action pressed")}
-            />
-            <Link.MenuAction
-              title="Share"
-              icon="square.and.arrow.up"
-              onPress={() => alert("Share pressed")}
-            />
-            <Link.Menu title="More" icon="ellipsis">
-              <Link.MenuAction
-                title="Delete"
-                icon="trash"
-                destructive
-                onPress={() => alert("Delete pressed")}
-              />
-            </Link.Menu>
-          </Link.Menu>
-        </Link>
+  const colorScheme = useColorScheme();
+  const colors = Colors[colorScheme as keyof typeof Colors];
 
-        <ThemedText>
-          {`Tap the Explore tab to learn more about what's included in this starter app.`}
-        </ThemedText>
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <ThemedText type="subtitle">Step 3: Get a fresh start</ThemedText>
-        <ThemedText>
-          {`When you're ready, run `}
-          <ThemedText type="defaultSemiBold">
-            npm run reset-project
-          </ThemedText>{" "}
-          to get a fresh <ThemedText type="defaultSemiBold">app</ThemedText>{" "}
-          directory. This will move the current{" "}
-          <ThemedText type="defaultSemiBold">app</ThemedText> to{" "}
-          <ThemedText type="defaultSemiBold">app-example</ThemedText>.
-        </ThemedText>
-      </ThemedView>
-    </ParallaxScrollView>
+  const handleNotificationPress = () => {
+    Alert.alert("Notificações", "Você tem 3 novas notificações");
+  };
+
+  const handleProfilePress = () => {
+    Alert.alert("Perfil", "Abrir perfil do usuário");
+  };
+
+  const handleSearch = (text: string) => {
+    if (text.trim()) {
+      Alert.alert("Pesquisa", `Buscando por: "${text}"`);
+    }
+  };
+
+  const handleProjectsPress = () => {
+    router.push("/(tabs)/projects");
+  };
+
+  const handleVotingPress = () => {
+    router.push("/(tabs)/voting");
+  };
+
+  return (
+    <View style={[styles.container, { backgroundColor: colors.secondary }]}>
+      <View style={styles.topSection}>
+        <View style={styles.decorativeElements}>
+          <View style={styles.bar1} />
+          <View style={styles.bar2} />
+          <View style={styles.bar3} />
+        </View>
+
+        <Header
+          userRole="Vereador"
+          onNotificationPress={handleNotificationPress}
+          onProfilePress={handleProfilePress}
+        />
+
+        <View style={styles.topContent}>
+          <View style={styles.greeting}>
+            <Text style={styles.greetingText}>Olá, Fulano56!</Text>
+          </View>
+
+          <SearchBar
+            placeholder="Encontre o que precisa"
+            onSearch={handleSearch}
+          />
+        </View>
+      </View>
+
+      <ScrollView
+        style={[styles.bottomSection, { backgroundColor: colors.background }]}
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={styles.contentContainer}
+      >
+        <ActionCard
+          title="Acessar Projetos"
+          subtitle="Seus projetos"
+          iconName="folder.fill"
+          onPress={handleProjectsPress}
+        />
+
+        <ActionCard
+          title="Sessão"
+          subtitle="Votação de propostas"
+          iconName="hand.thumbsup.fill"
+          onPress={handleVotingPress}
+        />
+      </ScrollView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  titleContainer: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
+  container: {
+    flex: 1,
   },
-  stepContainer: {
-    gap: 8,
-    marginBottom: 8,
+  topSection: {
+    height: "50%",
+    justifyContent: "space-between",
+    position: "relative",
   },
-  reactLogo: {
-    height: 178,
-    width: 290,
-    bottom: 0,
-    left: 0,
+  decorativeElements: {
     position: "absolute",
+    bottom: "-5%",
+    left: "50%",
+    transform: [{ translateX: -120 }],
+    flexDirection: "row",
+    alignItems: "flex-end",
+    gap: 24,
+  },
+  bar1: {
+    width: 64,
+    height: 192,
+    backgroundColor: "rgba(34, 197, 94, 0.15)", // Verde claro translúcido
+    borderRadius: 16,
+  },
+  bar2: {
+    width: 64,
+    height: 256,
+    backgroundColor: "rgba(34, 197, 94, 0.25)", // Verde mais visível
+    borderRadius: 16,
+  },
+  bar3: {
+    width: 64,
+    height: 144,
+    backgroundColor: "rgba(34, 197, 94, 0.1)", // Verde sutil
+    borderRadius: 16,
+  },
+  topContent: {
+    flex: 1,
+    justifyContent: "flex-end",
+    paddingBottom: Spacing.md,
+    gap: Spacing.md,
+  },
+  greeting: {
+    paddingHorizontal: Spacing.md,
+  },
+  greetingText: {
+    fontSize: 24,
+    fontWeight: "bold",
+    color: "#ffffff",
+  },
+  bottomSection: {
+    height: "50%",
+    borderTopLeftRadius: BorderRadius.xl,
+    borderTopRightRadius: BorderRadius.xl,
+  },
+  contentContainer: {
+    padding: Spacing.md,
+    paddingBottom: Spacing.xxl,
   },
 });
