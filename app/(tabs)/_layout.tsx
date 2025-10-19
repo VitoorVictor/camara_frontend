@@ -27,14 +27,6 @@ export default function TabLayout() {
         }}
       />
       <Tabs.Screen
-        name="projects"
-        options={{
-          tabBarIcon: ({ color }) => (
-            <IconSymbol size={28} name="folder.fill" color={color} />
-          ),
-        }}
-      />
-      <Tabs.Screen
         name="voting"
         options={{
           tabBarIcon: ({ color }) => (

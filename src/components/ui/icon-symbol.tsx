@@ -27,6 +27,7 @@ const MAPPING = {
   bell: "notifications",
   "person.circle": "account-circle",
   magnifyingglass: "search",
+  "chart.bar.fill": "bar-chart",
 } as IconMapping;
 
 /**

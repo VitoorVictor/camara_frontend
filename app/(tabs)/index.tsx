@@ -11,6 +11,7 @@ import { useColorScheme } from "@/hooks/use-color-scheme";
 export default function HomeScreen() {
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme as keyof typeof Colors];
+  const isPresident = true;
 
   const handleNotificationPress = () => {
     Alert.alert("Notificações", "Você tem 3 novas notificações");
@@ -26,12 +27,20 @@ export default function HomeScreen() {
     }
   };
 
-  const handleProjectsPress = () => {
-    router.push("/(tabs)/projects");
-  };
-
   const handleVotingPress = () => {
     router.push("/(tabs)/voting");
+  };
+
+  const handleProjectsPress = () => {
+    router.push("/(stacks)/projects");
+  };
+
+  const handleConfirmVotesPress = () => {
+    router.push("/(stacks)/confirm-votes");
+  };
+
+  const handleFinalResultsPress = () => {
+    router.push("/(stacks)/results");
   };
 
   return (
@@ -44,7 +53,7 @@ export default function HomeScreen() {
         </View>
 
         <Header
-          userRole="Vereador"
+          userRole={isPresident ? "Presidente" : "Vereador"}
           onNotificationPress={handleNotificationPress}
           onProfilePress={handleProfilePress}
         />
@@ -66,19 +75,36 @@ export default function HomeScreen() {
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.contentContainer}
       >
-        <ActionCard
-          title="Acessar Projetos"
-          subtitle="Seus projetos"
-          iconName="folder.fill"
-          onPress={handleProjectsPress}
-        />
-
-        <ActionCard
-          title="Sessão"
-          subtitle="Votação de propostas"
-          iconName="hand.thumbsup.fill"
-          onPress={handleVotingPress}
-        />
+        {!isPresident && (
+          <ActionCard
+            title="Sessão"
+            subtitle="Votação de propostas"
+            iconName="hand.thumbsup.fill"
+            onPress={handleVotingPress}
+          />
+        )}
+        {isPresident && (
+          <>
+            <ActionCard
+              title="Acessar Projetos"
+              subtitle="Seus projetos"
+              iconName="folder.fill"
+              onPress={handleProjectsPress}
+            />
+            <ActionCard
+              title="Confirmar Votos"
+              subtitle="Finalizar votação da sessão"
+              iconName="checkmark.square.fill"
+              onPress={handleConfirmVotesPress}
+            />
+            <ActionCard
+              title="Resultado Final"
+              subtitle="Visualizar resultado da votação"
+              iconName="chart.bar.fill"
+              onPress={handleFinalResultsPress}
+            />
+          </>
+        )}
       </ScrollView>
     </View>
   );
