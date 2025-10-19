@@ -43,6 +43,10 @@ export default function HomeScreen() {
     router.push("/(stacks)/results");
   };
 
+  const handleSessionsPress = () => {
+    router.push("/(stacks)/sessions");
+  };
+
   return (
     <View style={[styles.container, { backgroundColor: colors.secondary }]}>
       <View style={styles.topSection}>
@@ -77,7 +81,7 @@ export default function HomeScreen() {
       >
         {!isPresident && (
           <ActionCard
-            title="Sessão"
+            title="Sessão Aberta"
             subtitle="Votação de propostas"
             iconName="hand.thumbsup.fill"
             onPress={handleVotingPress}
@@ -85,6 +89,12 @@ export default function HomeScreen() {
         )}
         {isPresident && (
           <>
+            <ActionCard
+              title="Todas Sessões"
+              subtitle="Sessões legislativas"
+              iconName="calendar"
+              onPress={handleSessionsPress}
+            />
             <ActionCard
               title="Acessar Projetos"
               subtitle="Seus projetos"
@@ -167,6 +177,5 @@ const styles = StyleSheet.create({
   },
   contentContainer: {
     padding: Spacing.md,
-    paddingBottom: Spacing.xxl,
   },
 });

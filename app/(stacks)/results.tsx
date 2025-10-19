@@ -1,22 +1,24 @@
-import { Colors, FontSizes, FontWeights, Spacing } from "@/constants/theme";
+import {
+  BorderRadius,
+  Colors,
+  FontSizes,
+  FontWeights,
+  Spacing,
+} from "@/constants/theme";
 import { useColorScheme } from "@/hooks/use-color-scheme";
 import React from "react";
-import { StyleSheet, Text, View } from "react-native";
+import { ScrollView, StyleSheet, Text, View } from "react-native";
 
 export default function ResultsScreen() {
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme as keyof typeof Colors];
 
   return (
-    <View style={[styles.container, { backgroundColor: colors.background }]}>
-      <View style={styles.content}>
-        <Text style={[styles.title, { color: colors.primaryText }]}>
-          Resultado Final
-        </Text>
-        <Text style={[styles.subtitle, { color: colors.secondaryText }]}>
-          Visualize o resultado da votação
-        </Text>
-
+    <View style={styles.container}>
+      <ScrollView
+        style={[styles.content, { backgroundColor: colors.background }]}
+        contentContainerStyle={styles.contentContainer}
+      >
         {/* Aqui você pode adicionar gráficos e estatísticas */}
         <View
           style={[
@@ -40,7 +42,50 @@ export default function ResultsScreen() {
             Rejeitado: 15 votos (33.3%)
           </Text>
         </View>
-      </View>
+
+        <View
+          style={[
+            styles.card,
+            {
+              backgroundColor: colors.background,
+              borderColor: colors.border,
+            },
+          ]}
+        >
+          <Text style={[styles.cardTitle, { color: colors.primaryText }]}>
+            Projeto de Lei Nº 042/2024
+          </Text>
+          <Text style={[styles.cardText, { color: colors.secondaryText }]}>
+            Status: Aprovado
+          </Text>
+          <Text style={[styles.cardText, { color: colors.success }]}>
+            ✓ Maioria alcançada
+          </Text>
+        </View>
+
+        <View
+          style={[
+            styles.card,
+            {
+              backgroundColor: colors.background,
+              borderColor: colors.border,
+            },
+          ]}
+        >
+          <Text style={[styles.cardTitle, { color: colors.primaryText }]}>
+            Detalhes
+          </Text>
+          <Text style={[styles.cardText, { color: colors.secondaryText }]}>
+            Data: 19/10/2024
+          </Text>
+          <Text style={[styles.cardText, { color: colors.secondaryText }]}>
+            Horário: 14:30
+          </Text>
+          <Text style={[styles.cardText, { color: colors.secondaryText }]}>
+            Sessão: Ordinária
+          </Text>
+        </View>
+      </ScrollView>
     </View>
   );
 }
@@ -51,21 +96,16 @@ const styles = StyleSheet.create({
   },
   content: {
     flex: 1,
+  },
+  contentContainer: {
     padding: Spacing.md,
-  },
-  title: {
-    fontSize: FontSizes.xxl,
-    fontWeight: FontWeights.bold,
-    marginBottom: Spacing.sm,
-  },
-  subtitle: {
-    fontSize: FontSizes.md,
-    marginBottom: Spacing.lg,
+    paddingBottom: Spacing.xxl,
   },
   card: {
     padding: Spacing.md,
-    borderRadius: 12,
+    borderRadius: BorderRadius.lg,
     borderWidth: 1,
+    marginBottom: Spacing.md,
   },
   cardTitle: {
     fontSize: FontSizes.lg,

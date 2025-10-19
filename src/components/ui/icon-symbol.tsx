@@ -28,6 +28,7 @@ const MAPPING = {
   "person.circle": "account-circle",
   magnifyingglass: "search",
   "chart.bar.fill": "bar-chart",
+  "calendar": "calendar-month",
 } as IconMapping;
 
 /**

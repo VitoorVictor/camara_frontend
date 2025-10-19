@@ -1,22 +1,24 @@
-import { Colors, FontSizes, FontWeights, Spacing } from "@/constants/theme";
+import {
+  BorderRadius,
+  Colors,
+  FontSizes,
+  FontWeights,
+  Spacing,
+} from "@/constants/theme";
 import { useColorScheme } from "@/hooks/use-color-scheme";
 import React from "react";
-import { StyleSheet, Text, View } from "react-native";
+import { ScrollView, StyleSheet, Text, View } from "react-native";
 
 export default function ConfirmVotesScreen() {
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme as keyof typeof Colors];
 
   return (
-    <View style={[styles.container, { backgroundColor: colors.background }]}>
-      <View style={styles.content}>
-        <Text style={[styles.title, { color: colors.primaryText }]}>
-          Confirmar Votos
-        </Text>
-        <Text style={[styles.subtitle, { color: colors.secondaryText }]}>
-          Finalize a votação da sessão atual
-        </Text>
-
+    <View style={styles.container}>
+      <ScrollView
+        style={[styles.content, { backgroundColor: colors.background }]}
+        contentContainerStyle={styles.contentContainer}
+      >
         {/* Aqui você pode adicionar o conteúdo específico para confirmar votos */}
         <View
           style={[
@@ -35,7 +37,30 @@ export default function ConfirmVotesScreen() {
             desfeita.
           </Text>
         </View>
-      </View>
+
+        <View
+          style={[
+            styles.card,
+            {
+              backgroundColor: colors.background,
+              borderColor: colors.border,
+            },
+          ]}
+        >
+          <Text style={[styles.cardTitle, { color: colors.primaryText }]}>
+            Resumo dos Votos
+          </Text>
+          <Text style={[styles.cardText, { color: colors.secondaryText }]}>
+            Total de votantes: 45 vereadores
+          </Text>
+          <Text style={[styles.cardText, { color: colors.secondaryText }]}>
+            Votos confirmados: 42
+          </Text>
+          <Text style={[styles.cardText, { color: colors.secondaryText }]}>
+            Aguardando: 3
+          </Text>
+        </View>
+      </ScrollView>
     </View>
   );
 }
@@ -46,21 +71,16 @@ const styles = StyleSheet.create({
   },
   content: {
     flex: 1,
+  },
+  contentContainer: {
     padding: Spacing.md,
-  },
-  title: {
-    fontSize: FontSizes.xxl,
-    fontWeight: FontWeights.bold,
-    marginBottom: Spacing.sm,
-  },
-  subtitle: {
-    fontSize: FontSizes.md,
-    marginBottom: Spacing.lg,
+    paddingBottom: Spacing.xxl,
   },
   card: {
     padding: Spacing.md,
-    borderRadius: 12,
+    borderRadius: BorderRadius.lg,
     borderWidth: 1,
+    marginBottom: Spacing.md,
   },
   cardTitle: {
     fontSize: FontSizes.lg,
@@ -70,5 +90,6 @@ const styles = StyleSheet.create({
   cardText: {
     fontSize: FontSizes.md,
     lineHeight: 24,
+    marginBottom: Spacing.xs,
   },
 });
