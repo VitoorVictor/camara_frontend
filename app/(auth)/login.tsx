@@ -1,4 +1,5 @@
 import { Ionicons } from "@expo/vector-icons";
+import { router } from "expo-router";
 import React, { useState } from "react";
 import {
   Alert,
@@ -14,28 +15,36 @@ import {
 
 import {
   BorderRadius,
-  Colors,
   FontSizes,
   FontWeights,
   Spacing,
 } from "@/constants/theme";
-import { useColorScheme } from "@/hooks/use-color-scheme";
+import { useAuth } from "@/contexts/AuthContext";
 
 export default function LoginScreen() {
-  const colorScheme = useColorScheme();
-  const colors = Colors[colorScheme as keyof typeof Colors];
+  const { signIn, loading } = useAuth();
 
-  const [email, setEmail] = useState("");
+  const [userName, setUserName] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
 
-  const handleLogin = () => {
-    if (!email.trim() || !password.trim()) {
+  const handleLogin = async () => {
+    if (!userName.trim() || !password.trim()) {
       Alert.alert("Erro", "Por favor, preencha todos os campos");
       return;
     }
 
-    Alert.alert("Sucesso", "Login realizado com sucesso!");
+    try {
+      setIsLoading(true);
+      await signIn(userName, password);
+      // Navega para a tela principal após login bem-sucedido
+      router.replace("/(tabs)");
+    } catch (error: any) {
+      Alert.alert("Erro no Login", error.message || "Erro ao fazer login");
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const handleForgotPassword = () => {
@@ -83,14 +92,13 @@ export default function LoginScreen() {
         {/* Formulário de Login */}
         <View style={styles.formSection}>
           <View style={styles.inputContainer}>
-            <Ionicons name="mail-outline" size={20} color="#9CA3AF" />
+            <Ionicons name="person-outline" size={20} color="#9CA3AF" />
             <TextInput
               style={styles.input}
-              placeholder="Entre com seu email"
+              placeholder="Entre com seu usuário"
               placeholderTextColor="#9CA3AF"
-              value={email}
-              onChangeText={setEmail}
-              keyboardType="email-address"
+              value={userName}
+              onChangeText={setUserName}
               autoCapitalize="none"
               autoCorrect={false}
             />
@@ -127,8 +135,17 @@ export default function LoginScreen() {
             <Text style={styles.forgotPasswordText}>Esqueceu a senha</Text>
           </TouchableOpacity>
 
-          <TouchableOpacity style={styles.loginButton} onPress={handleLogin}>
-            <Text style={styles.loginButtonText}>Entrar</Text>
+          <TouchableOpacity
+            style={[
+              styles.loginButton,
+              isLoading && styles.loginButtonDisabled,
+            ]}
+            onPress={handleLogin}
+            disabled={isLoading}
+          >
+            <Text style={styles.loginButtonText}>
+              {isLoading ? "Entrando..." : "Entrar"}
+            </Text>
           </TouchableOpacity>
         </View>
 
@@ -252,6 +269,10 @@ const styles = StyleSheet.create({
     borderRadius: BorderRadius.md,
     paddingVertical: Spacing.md,
     alignItems: "center",
+  },
+  loginButtonDisabled: {
+    backgroundColor: "#9CA3AF",
+    opacity: 0.7,
   },
   loginButtonText: {
     fontSize: FontSizes.md,

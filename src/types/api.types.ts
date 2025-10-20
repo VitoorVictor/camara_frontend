@@ -25,23 +25,41 @@ export interface ApiError {
 
 // Tipos de requisição
 export interface LoginRequest {
-  email: string;
+  userName: string;
   password: string;
 }
 
-export interface RegisterRequest {
-  name: string;
-  email: string;
-  password: string;
-  passwordConfirmation: string;
+// Tipos específicos para sua API
+export interface LoginResponse {
+  accessToken: string;
+  expiration: string;
+  currentUser: CurrentUser;
 }
 
-// Tipos de resposta
-export interface AuthResponse {
-  token: string;
-  user: {
-    id: string;
-    name: string;
-    email: string;
-  };
+export interface CurrentUser {
+  camara: any;
+  camaraId: string;
+  nomeCompleto: string;
+  createdAt: string;
+  updatedAt: string | null;
+  id: string;
+  userName: string;
+  normalizedUserName: string;
+  email: string;
+  normalizedEmail: string;
+  emailConfirmed: boolean;
+  passwordHash: string;
+  securityStamp: string;
+  concurrencyStamp: string;
+  phoneNumber: string;
+  phoneNumberConfirmed: boolean;
+  twoFactorEnabled: boolean;
+  lockoutEnd: string | null;
+  lockoutEnabled: boolean;
+  accessFailedCount: number;
+}
+
+export interface AuthError {
+  message: string;
+  statusCode?: number;
 }

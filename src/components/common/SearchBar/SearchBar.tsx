@@ -39,7 +39,7 @@ export function SearchBar({
       >
         <IconSymbol
           name="magnifyingglass"
-          size={20}
+          size={28}
           color={colors.disabledText}
         />
         <TextInput

@@ -3,11 +3,13 @@ import {
   DefaultTheme,
   ThemeProvider,
 } from "@react-navigation/native";
-import { Stack } from "expo-router";
+import { Stack, useRouter, useSegments } from "expo-router";
 import { StatusBar } from "expo-status-bar";
+import { useEffect } from "react";
 import { StyleSheet, Text, View } from "react-native";
 import "react-native-reanimated";
 
+import { AuthProvider, useAuth } from "@/contexts/AuthContext";
 import { useColorScheme } from "@/hooks/use-color-scheme";
 import { Colors, FontSizes, FontWeights } from "@/src/constants/theme";
 
@@ -29,13 +31,38 @@ const CustomHeaderTitle = ({
   </View>
 );
 
-export default function RootLayout() {
+// Componente de proteção de rotas
+function ProtectedRoutes() {
+  const { isAuthenticated, loading } = useAuth();
+  const segments = useSegments();
+  const router = useRouter();
+
+  useEffect(() => {
+    if (loading) return; // Aguarda carregar dados do AsyncStorage
+
+    const inAuthGroup = segments[0] === "(auth)";
+
+    if (!isAuthenticated && !inAuthGroup) {
+      // Usuário não autenticado tentando acessar rota protegida
+      router.replace("/(auth)/login");
+    } else if (isAuthenticated && inAuthGroup) {
+      // Usuário autenticado tentando acessar tela de login
+      router.replace("/(tabs)");
+    }
+  }, [isAuthenticated, loading, segments]);
+
+  return <RootLayoutNav />;
+}
+
+// Navegação principal
+function RootLayoutNav() {
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme as keyof typeof Colors];
 
   return (
     <ThemeProvider value={colorScheme === "dark" ? DarkTheme : DefaultTheme}>
       <Stack>
+        <Stack.Screen name="(auth)" options={{ headerShown: false }} />
         <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
         <Stack.Screen
           name="(stacks)/confirm-votes"
@@ -92,6 +119,15 @@ export default function RootLayout() {
       </Stack>
       <StatusBar style={colorScheme === "dark" ? "light" : "dark"} />
     </ThemeProvider>
+  );
+}
+
+// Layout raiz com AuthProvider
+export default function RootLayout() {
+  return (
+    <AuthProvider>
+      <ProtectedRoutes />
+    </AuthProvider>
   );
 }
 

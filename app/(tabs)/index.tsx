@@ -6,11 +6,13 @@ import { ActionCard } from "@/components/common/ActionCard";
 import { SearchBar } from "@/components/common/SearchBar";
 import { Header } from "@/components/layout/Header";
 import { BorderRadius, Colors, Spacing } from "@/constants/theme";
+import { useAuth } from "@/contexts/AuthContext";
 import { useColorScheme } from "@/hooks/use-color-scheme";
 
 export default function HomeScreen() {
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme as keyof typeof Colors];
+  const { user } = useAuth();
   const isPresident = true;
 
   const handleNotificationPress = () => {
@@ -64,7 +66,9 @@ export default function HomeScreen() {
 
         <View style={styles.topContent}>
           <View style={styles.greeting}>
-            <Text style={styles.greetingText}>Olá, Fulano56!</Text>
+            <Text style={styles.greetingText}>
+              Olá, {user?.nomeCompleto || "Usuário"}!
+            </Text>
           </View>
 
           <SearchBar

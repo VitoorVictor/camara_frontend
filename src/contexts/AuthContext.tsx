@@ -1,18 +1,3 @@
-/**
- * Context de Autenticação
- *
- * Exemplo de uso:
- *
- * import { useAuth } from '@/contexts/AuthContext';
- *
- * function MeuComponente() {
- *   const { user, login, logout } = useAuth();
- *   // ...
- * }
- */
-
-import { storage } from "@/services/storage/asyncStorage";
-import { User } from "@/types/models.types";
 import React, {
   createContext,
   ReactNode,
@@ -21,10 +6,13 @@ import React, {
   useState,
 } from "react";
 
+import { authService } from "@/services/authService";
+import { CurrentUser } from "@/types/api.types";
+
 interface AuthContextData {
-  user: User | null;
+  user: CurrentUser | null;
   loading: boolean;
-  signIn: (email: string, password: string) => Promise<void>;
+  signIn: (userName: string, password: string) => Promise<void>;
   signOut: () => Promise<void>;
   isAuthenticated: boolean;
 }
@@ -36,7 +24,7 @@ interface AuthProviderProps {
 }
 
 export function AuthProvider({ children }: AuthProviderProps) {
-  const [user, setUser] = useState<User | null>(null);
+  const [user, setUser] = useState<CurrentUser | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -45,9 +33,12 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
   async function loadStorageData() {
     try {
-      const storedUser = await storage.getItem<User>("USER");
-      if (storedUser) {
-        setUser(storedUser);
+      const isAuth = await authService.isAuthenticated();
+      if (isAuth) {
+        const storedUser = await authService.getCurrentUser();
+        if (storedUser) {
+          setUser(storedUser);
+        }
       }
     } catch (error) {
       console.error("Erro ao carregar dados do usuário:", error);
@@ -56,37 +47,28 @@ export function AuthProvider({ children }: AuthProviderProps) {
     }
   }
 
-  async function signIn(email: string, password: string) {
+  async function signIn(userName: string, password: string) {
     try {
-      // TODO: Implementar chamada à API
-      // const response = await api.post('/auth/login', { email, password });
-
-      // Exemplo de resposta mockada:
-      const mockUser: User = {
-        id: "1",
-        name: "Usuário Teste",
-        email: email,
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-      };
-
-      setUser(mockUser);
-      await storage.setItem("USER", mockUser);
-      // await storage.setItem('TOKEN', response.token);
-    } catch (error) {
-      console.error("Erro ao fazer login:", error);
+      setLoading(true);
+      const response = await authService.login({ userName, password });
+      setUser(response.currentUser);
+    } catch (error: any) {
       throw error;
+    } finally {
+      setLoading(false);
     }
   }
 
   async function signOut() {
     try {
+      setLoading(true);
+      await authService.logout();
       setUser(null);
-      await storage.removeItem("USER");
-      await storage.removeItem("TOKEN");
     } catch (error) {
       console.error("Erro ao fazer logout:", error);
       throw error;
+    } finally {
+      setLoading(false);
     }
   }
 
