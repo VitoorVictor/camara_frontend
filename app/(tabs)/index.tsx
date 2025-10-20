@@ -3,7 +3,6 @@ import React from "react";
 import { Alert, ScrollView, StyleSheet, Text, View } from "react-native";
 
 import { ActionCard } from "@/components/common/ActionCard";
-import { SearchBar } from "@/components/common/SearchBar";
 import { Header } from "@/components/layout/Header";
 import { BorderRadius, Colors, Spacing } from "@/constants/theme";
 import { useAuth } from "@/contexts/AuthContext";
@@ -71,10 +70,10 @@ export default function HomeScreen() {
             </Text>
           </View>
 
-          <SearchBar
+          {/* <SearchBar
             placeholder="Encontre o que precisa"
             onSearch={handleSearch}
-          />
+          /> */}
         </View>
       </View>
 
@@ -99,12 +98,12 @@ export default function HomeScreen() {
               iconName="calendar"
               onPress={handleSessionsPress}
             />
-            <ActionCard
+            {/* <ActionCard
               title="Acessar Projetos"
               subtitle="Seus projetos"
               iconName="folder.fill"
               onPress={handleProjectsPress}
-            />
+            /> */}
             <ActionCard
               title="Confirmar Votos"
               subtitle="Finalizar votação da sessão"
