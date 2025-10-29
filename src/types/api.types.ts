@@ -39,7 +39,8 @@ export interface LoginResponse {
 export interface CurrentUser {
   camara: any;
   camaraId: string;
-  nomeCompleto: string;
+  nome: string;
+  sobrenome: string;
   createdAt: string;
   updatedAt: string | null;
   id: string;

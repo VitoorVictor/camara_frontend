@@ -27,23 +27,17 @@ export default function LoginScreen() {
   const [userName, setUserName] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
-  const [isLoading, setIsLoading] = useState(false);
 
   const handleLogin = async () => {
     if (!userName.trim() || !password.trim()) {
       Alert.alert("Erro", "Por favor, preencha todos os campos");
       return;
     }
-
     try {
-      setIsLoading(true);
       await signIn(userName, password);
-      // Navega para a tela principal após login bem-sucedido
       router.replace("/(tabs)");
     } catch (error: any) {
       Alert.alert("Erro no Login", error.message || "Erro ao fazer login");
-    } finally {
-      setIsLoading(false);
     }
   };
 
@@ -136,15 +130,12 @@ export default function LoginScreen() {
           </TouchableOpacity>
 
           <TouchableOpacity
-            style={[
-              styles.loginButton,
-              isLoading && styles.loginButtonDisabled,
-            ]}
+            style={[styles.loginButton, loading && styles.loginButtonDisabled]}
             onPress={handleLogin}
-            disabled={isLoading}
+            disabled={loading}
           >
             <Text style={styles.loginButtonText}>
-              {isLoading ? "Entrando..." : "Entrar"}
+              {loading ? "Entrando..." : "Entrar"}
             </Text>
           </TouchableOpacity>
         </View>

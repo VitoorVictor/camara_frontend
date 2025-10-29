@@ -66,7 +66,7 @@ export default function HomeScreen() {
         <View style={styles.topContent}>
           <View style={styles.greeting}>
             <Text style={styles.greetingText}>
-              Olá, {user?.nomeCompleto || "Usuário"}!
+              Olá, {user?.nome + " " + user?.sobrenome || "Usuário"}!
             </Text>
           </View>
 

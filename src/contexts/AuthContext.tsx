@@ -52,6 +52,30 @@ export function AuthProvider({ children }: AuthProviderProps) {
       setLoading(true);
       const response = await authService.login({ userName, password });
       setUser(response.currentUser);
+      // setUser({
+      //   camara: null,
+      //   camaraId: "658c5bd8-7ca0-482b-bbae-bd783c0c97c8",
+      //   nome: "Vereadore",
+      //   sobrenome: "Presidente",
+      //   createdAt: "2025-10-27T22:14:18.439174",
+      //   updatedAt: null,
+      //   id: "c3a256ef-a94c-429e-9e20-9562b0d5f330",
+      //   userName: "vereadorpresidente",
+      //   normalizedUserName: "VEREADORPRESIDENTE",
+      //   email: "presidente@exemplo.com",
+      //   normalizedEmail: "PRESIDENTE@EXEMPLO.COM",
+      //   emailConfirmed: true,
+      //   passwordHash:
+      //     "AQAAAAIAAYagAAAAEKCGuIORMeDoaMTPZl67TlTFWWgGnImrIhTY7OtN2M8Q2rECPG8pAR6OOJ9dENrmUA==",
+      //   securityStamp: "EJ4ZPDEESYSKQDALEBZ6NNEDVEPXGQGI",
+      //   concurrencyStamp: "80d9f748-1d10-432b-a5cb-546f4b206873",
+      //   phoneNumber: "11877777777",
+      //   phoneNumberConfirmed: true,
+      //   twoFactorEnabled: false,
+      //   lockoutEnd: null,
+      //   lockoutEnabled: true,
+      //   accessFailedCount: 0,
+      // });
     } catch (error: any) {
       throw error;
     } finally {
