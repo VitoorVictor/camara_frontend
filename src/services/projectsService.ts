@@ -1,26 +1,17 @@
+import { ProjetoStatusEnum } from "../enums/ProjetoStatusEnum";
 import { api } from "./api";
 
-// Tipos (você pode criar em types/ se preferir)
-interface Project {
+// Tipos
+export interface Project {
   id: string;
-  number: string;
-  title: string;
-  description: string;
-  status: "pending" | "voting" | "approved" | "rejected";
-  author: string;
-  createdAt: string;
-}
-
-interface CreateProjectData {
-  number: string;
-  title: string;
-  description: string;
-  author: string;
-}
-
-interface Vote {
-  projectId: string;
-  vote: "yes" | "no" | "abstain";
+  criadoEm: string;
+  titulo: string;
+  descricao: string;
+  status: ProjetoStatusEnum;
+  aprovado: boolean;
+  autorId: string;
+  autorNome: string;
+  autorSobrenome: string;
 }
 
 /**
@@ -44,58 +35,56 @@ export const projectsService = {
   },
 
   /**
-   * Cria um novo projeto
+   * Lista projetos por sessão
    */
-  async create(projectData: CreateProjectData): Promise<Project> {
-    const { data } = await api.post<Project>("/projects", projectData);
-    return data;
-  },
+  async getBySession(sessionId: string): Promise<Project[]> {
+    // TODO: Descomentar quando API estiver pronta
+    // const { data } = await api.get<Project[]>(
+    //   `/sessao/list-projetos-by-sessao/${sessionId}`
+    // );
+    // return data;
 
-  /**
-   * Atualiza um projeto
-   */
-  async update(
-    id: string,
-    projectData: Partial<CreateProjectData>
-  ): Promise<Project> {
-    const { data } = await api.put<Project>(`/projects/${id}`, projectData);
-    return data;
-  },
-
-  /**
-   * Deleta um projeto
-   */
-  async delete(id: string): Promise<void> {
-    await api.delete(`/projects/${id}`);
-  },
-
-  /**
-   * Busca projetos por status
-   */
-  async getByStatus(status: string): Promise<Project[]> {
-    const { data } = await api.get<Project[]>(`/projects?status=${status}`);
-    return data;
-  },
-
-  /**
-   * Registra um voto em um projeto
-   */
-  async vote(voteData: Vote): Promise<void> {
-    await api.post("/projects/vote", voteData);
-  },
-
-  /**
-   * Busca projetos em votação
-   */
-  async getVoting(): Promise<Project[]> {
-    return this.getByStatus("voting");
-  },
-
-  /**
-   * Busca resultados de votação de um projeto
-   */
-  async getResults(id: string): Promise<any> {
-    const { data } = await api.get(`/projects/${id}/results`);
-    return data;
+    // Mock temporário
+    return new Promise((resolve) => {
+      setTimeout(() => {
+        resolve([
+          {
+            id: "1",
+            criadoEm: "2024-01-15T10:00:00",
+            titulo: "Projeto de Lei nº 001/2024",
+            descricao:
+              "Institui o plano de ação para melhoria da infraestrutura municipal",
+            status: ProjetoStatusEnum.EmVotacao,
+            aprovado: false,
+            autorId: "10",
+            autorNome: "João",
+            autorSobrenome: "Silva",
+          },
+          {
+            id: "2",
+            criadoEm: "2024-01-15T10:30:00",
+            titulo: "Projeto de Lei nº 002/2024",
+            descricao: "Cria o programa de incentivo à reciclagem no município",
+            status: ProjetoStatusEnum.Apresentado,
+            aprovado: false,
+            autorId: "11",
+            autorNome: "Maria",
+            autorSobrenome: "Santos",
+          },
+          {
+            id: "3",
+            criadoEm: "2024-01-15T11:00:00",
+            titulo: "Projeto de Lei nº 003/2024",
+            descricao:
+              "Regulamenta o uso de bicicletas compartilhadas na cidade",
+            status: ProjetoStatusEnum.EmVotacao,
+            aprovado: false,
+            autorId: "12",
+            autorNome: "Pedro",
+            autorSobrenome: "Oliveira",
+          },
+        ]);
+      }, 500);
+    });
   },
 };

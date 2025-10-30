@@ -1,3 +1,5 @@
+import { DatePicker } from "@/components/common/DatePicker";
+import { SearchBar } from "@/components/common/SearchBar";
 import {
   BorderRadius,
   Colors,
@@ -5,9 +7,19 @@ import {
   FontWeights,
   Spacing,
 } from "@/constants/theme";
-import { useColorScheme } from "@/hooks/use-color-scheme";
-import React from "react";
 import {
+  SessaoStatusEnum,
+  getSessaoStatusLabel,
+} from "@/enums/SessaoStatusEnum";
+import { useColorScheme } from "@/hooks/use-color-scheme";
+import {
+  ListSessionsParams,
+  Session,
+  sessionsService,
+} from "@/services/sessionsService";
+import React, { useEffect, useState } from "react";
+import {
+  ActivityIndicator,
   ScrollView,
   StyleSheet,
   Text,
@@ -18,6 +30,94 @@ import {
 export default function SessionsScreen() {
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme as keyof typeof Colors];
+  const [sessions, setSessions] = useState<Session[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [filters, setFilters] = useState<ListSessionsParams>({});
+
+  useEffect(() => {
+    loadSessions();
+  }, []);
+
+  const loadSessions = async (params?: ListSessionsParams) => {
+    try {
+      setLoading(true);
+      const data = await sessionsService.listByCamara(params || filters);
+      setSessions(data);
+    } catch (error) {
+      console.error("Erro ao carregar sessões:", error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleSearch = (text: string) => {
+    const newFilters = { ...filters, nome: text || undefined };
+    setFilters(newFilters);
+    loadSessions(newFilters);
+  };
+
+  const handleDateChange = (date: string) => {
+    const newFilters = { ...filters, data: date || undefined };
+    setFilters(newFilters);
+    loadSessions(newFilters);
+  };
+
+  const handleStatusChange = (status: SessaoStatusEnum | "all") => {
+    const newFilters = {
+      ...filters,
+      status: status === "all" ? undefined : status,
+    };
+    setFilters(newFilters);
+    loadSessions(newFilters);
+  };
+
+  const clearFilters = () => {
+    const emptyFilters: ListSessionsParams = {};
+    setFilters(emptyFilters);
+    loadSessions(emptyFilters);
+  };
+
+  const getStatusBadgeColor = (status: SessaoStatusEnum) => {
+    switch (status) {
+      case SessaoStatusEnum.EmAndamento:
+        return colors.success;
+      case SessaoStatusEnum.Agendada:
+        return colors.warning;
+      case SessaoStatusEnum.Encerrada:
+        return colors.inactive;
+      case SessaoStatusEnum.Cancelada:
+        return colors.error;
+      default:
+        return colors.inactive;
+    }
+  };
+
+  const formatDate = (dateString: string) => {
+    const date = new Date(dateString);
+    return date.toLocaleDateString("pt-BR", {
+      day: "2-digit",
+      month: "2-digit",
+      year: "numeric",
+    });
+  };
+
+  const handleOpenSession = async (id: string) => {
+    try {
+      await sessionsService.start(id);
+      loadSessions(); // Recarrega a lista de sessões
+    } catch (error) {
+      console.error("Erro ao abrir sessão:", error);
+    }
+  };
+
+  const handleFinishSession = async (id: string) => {
+    try {
+      await sessionsService.finish(id);
+      loadSessions(); // Recarrega a lista de sessões
+    } catch (error) {
+      console.error("Erro ao encerrar sessão:", error);
+    }
+  };
 
   return (
     <View style={styles.container}>
@@ -25,175 +125,199 @@ export default function SessionsScreen() {
         style={[styles.content, { backgroundColor: colors.background }]}
         contentContainerStyle={styles.contentContainer}
       >
-        {/* Sessão Ativa */}
-        <View
-          style={[
-            styles.card,
-            styles.activeCard,
-            {
-              backgroundColor: colors.background,
-              borderColor: colors.success,
-            },
-          ]}
+        {/* Filtro por status */}
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          style={styles.statusButtonsContainer}
+          contentContainerStyle={styles.statusButtonsContent}
         >
-          <View style={styles.cardHeader}>
-            <View>
-              <Text style={[styles.cardTitle, { color: colors.primaryText }]}>
-                Sessão Ordinária #45
-              </Text>
-              <Text style={[styles.cardDate, { color: colors.secondaryText }]}>
-                19 de Outubro de 2024 • 14:00
-              </Text>
-            </View>
-            <View
-              style={[styles.statusBadge, { backgroundColor: colors.success }]}
-            >
-              <Text style={styles.statusText}>Em Andamento</Text>
-            </View>
-          </View>
-          <Text
-            style={[styles.cardDescription, { color: colors.secondaryText }]}
-          >
-            Votação de projetos de lei municipais e debates sobre a ordem do
-            dia.
-          </Text>
-          <View style={styles.cardStats}>
-            <View style={styles.statItem}>
-              <Text style={[styles.statValue, { color: colors.primary }]}>
-                8
-              </Text>
-              <Text style={[styles.statLabel, { color: colors.secondaryText }]}>
-                Projetos
-              </Text>
-            </View>
-            <View style={styles.statItem}>
-              <Text style={[styles.statValue, { color: colors.primary }]}>
-                45
-              </Text>
-              <Text style={[styles.statLabel, { color: colors.secondaryText }]}>
-                Presentes
-              </Text>
-            </View>
-            <View style={styles.statItem}>
-              <Text style={[styles.statValue, { color: colors.primary }]}>
-                3
-              </Text>
-              <Text style={[styles.statLabel, { color: colors.secondaryText }]}>
-                Votados
-              </Text>
-            </View>
-          </View>
           <TouchableOpacity
-            style={[styles.button, { backgroundColor: colors.primary }]}
+            style={[
+              styles.statusButton,
+              {
+                backgroundColor:
+                  filters.status === undefined ? colors.primary : "#ffffff",
+                borderColor:
+                  filters.status === undefined
+                    ? colors.primary
+                    : "rgba(0, 0, 0, 0.1)",
+              },
+            ]}
+            onPress={() => handleStatusChange("all")}
           >
-            <Text style={styles.buttonText}>Acessar Sessão</Text>
+            <Text
+              style={[
+                styles.statusButtonText,
+                {
+                  color:
+                    filters.status === undefined
+                      ? "#ffffff"
+                      : colors.primaryText,
+                },
+              ]}
+            >
+              Todos
+            </Text>
           </TouchableOpacity>
+          {Object.values(SessaoStatusEnum)
+            .filter((v) => typeof v === "number")
+            .map((status) => (
+              <TouchableOpacity
+                key={status}
+                style={[
+                  styles.statusButton,
+                  {
+                    backgroundColor:
+                      filters.status === status ? colors.primary : "#ffffff",
+                    borderColor:
+                      filters.status === status
+                        ? colors.primary
+                        : "rgba(0, 0, 0, 0.1)",
+                  },
+                ]}
+                onPress={() => handleStatusChange(status as SessaoStatusEnum)}
+              >
+                <Text
+                  style={[
+                    styles.statusButtonText,
+                    {
+                      color:
+                        filters.status === status
+                          ? "#ffffff"
+                          : colors.primaryText,
+                    },
+                  ]}
+                >
+                  {getSessaoStatusLabel(status as SessaoStatusEnum)}
+                </Text>
+              </TouchableOpacity>
+            ))}
+        </ScrollView>
+
+        {/* Pesquisa e Data */}
+        <View style={styles.searchDateContainer}>
+          <SearchBar
+            placeholder="Pesquisar por nome da sessão"
+            value={filters.nome}
+            onChangeText={(text) => setFilters({ ...filters, nome: text })}
+            onSearch={handleSearch}
+          />
+          <DatePicker
+            value={filters.data}
+            onChange={handleDateChange}
+            placeholder="Data"
+          />
         </View>
 
-        {/* Próximas Sessões */}
-        <Text style={[styles.sectionTitle, { color: colors.primaryText }]}>
-          Próximas Sessões
+        {/* Lista de Sessões */}
+        <Text style={[styles.listTitle, { color: colors.primaryText }]}>
+          Sessões ({sessions.length})
         </Text>
 
-        <View
-          style={[
-            styles.card,
-            {
-              backgroundColor: colors.background,
-              borderColor: colors.border,
-            },
-          ]}
-        >
-          <View style={styles.cardHeader}>
-            <View>
-              <Text style={[styles.cardTitle, { color: colors.primaryText }]}>
-                Sessão Extraordinária #12
-              </Text>
-              <Text style={[styles.cardDate, { color: colors.secondaryText }]}>
-                25 de Outubro de 2024 • 09:00
-              </Text>
-            </View>
-            <View
-              style={[styles.statusBadge, { backgroundColor: colors.warning }]}
-            >
-              <Text style={styles.statusText}>Agendada</Text>
-            </View>
+        {loading ? (
+          <View style={styles.loadingContainer}>
+            <ActivityIndicator size="large" color={colors.primary} />
           </View>
-          <Text
-            style={[styles.cardDescription, { color: colors.secondaryText }]}
-          >
-            Discussão e votação de projeto de lei complementar sobre orçamento.
+        ) : sessions.length === 0 ? (
+          <Text style={[styles.emptyText, { color: colors.secondaryText }]}>
+            Nenhuma sessão encontrada
           </Text>
-        </View>
-
-        <View
-          style={[
-            styles.card,
-            {
-              backgroundColor: colors.background,
-              borderColor: colors.border,
-            },
-          ]}
-        >
-          <View style={styles.cardHeader}>
-            <View>
-              <Text style={[styles.cardTitle, { color: colors.primaryText }]}>
-                Sessão Ordinária #46
-              </Text>
-              <Text style={[styles.cardDate, { color: colors.secondaryText }]}>
-                26 de Outubro de 2024 • 14:00
-              </Text>
-            </View>
-            <View
-              style={[styles.statusBadge, { backgroundColor: colors.warning }]}
+        ) : (
+          sessions.map((session) => (
+            <TouchableOpacity
+              key={session.id}
+              style={[
+                styles.card,
+                {
+                  backgroundColor: "#ffffff",
+                  borderColor: colors.border,
+                },
+              ]}
             >
-              <Text style={styles.statusText}>Agendada</Text>
-            </View>
-          </View>
-          <Text
-            style={[styles.cardDescription, { color: colors.secondaryText }]}
-          >
-            Sessão ordinária semanal com pauta geral.
-          </Text>
-        </View>
+              <View style={styles.cardHeader}>
+                <View style={styles.cardTitleContainer}>
+                  <Text
+                    style={[styles.cardTitle, { color: colors.primaryText }]}
+                  >
+                    {session.nome}
+                  </Text>
+                </View>
+                <View
+                  style={[
+                    styles.statusBadge,
+                    { backgroundColor: getStatusBadgeColor(session.status) },
+                  ]}
+                >
+                  <Text style={styles.statusText}>
+                    {getSessaoStatusLabel(session.status)}
+                  </Text>
+                </View>
+              </View>
 
-        {/* Sessões Anteriores */}
-        <Text style={[styles.sectionTitle, { color: colors.primaryText }]}>
-          Sessões Anteriores
-        </Text>
+              <Text
+                style={[
+                  styles.cardDescription,
+                  { color: colors.secondaryText },
+                ]}
+              >
+                {session.descricao}
+              </Text>
 
-        <View
-          style={[
-            styles.card,
-            {
-              backgroundColor: colors.background,
-              borderColor: colors.border,
-            },
-          ]}
-        >
-          <View style={styles.cardHeader}>
-            <View>
-              <Text style={[styles.cardTitle, { color: colors.primaryText }]}>
-                Sessão Ordinária #44
-              </Text>
-              <Text style={[styles.cardDate, { color: colors.secondaryText }]}>
-                12 de Outubro de 2024 • 14:00
-              </Text>
-            </View>
-            <View
-              style={[styles.statusBadge, { backgroundColor: colors.inactive }]}
-            >
-              <Text style={[styles.statusText, { color: colors.primaryText }]}>
-                Encerrada
-              </Text>
-            </View>
-          </View>
-          <Text
-            style={[styles.cardDescription, { color: colors.secondaryText }]}
-          >
-            5 projetos votados • 42 vereadores presentes
-          </Text>
-        </View>
+              <View style={styles.cardFooter}>
+                <View style={styles.cardDateContainer}>
+                  <Text
+                    style={[styles.dateLabel, { color: colors.secondaryText }]}
+                  >
+                    Data:
+                  </Text>
+                  <Text
+                    style={[styles.dateValue, { color: colors.primaryText }]}
+                  >
+                    {formatDate(session.data)}
+                  </Text>
+                </View>
+                <View style={styles.cardDateContainer}>
+                  <Text
+                    style={[styles.dateLabel, { color: colors.secondaryText }]}
+                  >
+                    Aberta em:
+                  </Text>
+                  <Text
+                    style={[styles.dateValue, { color: colors.primaryText }]}
+                  >
+                    {new Date(session.abertoEm).toLocaleDateString("pt-BR")}
+                  </Text>
+                </View>
+              </View>
+
+              {/* Botões de ação */}
+              {session.status === SessaoStatusEnum.Agendada && (
+                <TouchableOpacity
+                  style={[
+                    styles.actionButton,
+                    { backgroundColor: colors.primary },
+                  ]}
+                  onPress={() => handleOpenSession(session.id)}
+                >
+                  <Text style={styles.actionButtonText}>Abrir Sessão</Text>
+                </TouchableOpacity>
+              )}
+
+              {session.status === SessaoStatusEnum.EmAndamento && (
+                <TouchableOpacity
+                  style={[
+                    styles.actionButton,
+                    { backgroundColor: colors.error },
+                  ]}
+                  onPress={() => handleFinishSession(session.id)}
+                >
+                  <Text style={styles.actionButtonText}>Encerrar Sessão</Text>
+                </TouchableOpacity>
+              )}
+            </TouchableOpacity>
+          ))
+        )}
       </ScrollView>
     </View>
   );
@@ -210,11 +334,48 @@ const styles = StyleSheet.create({
     padding: Spacing.md,
     paddingBottom: Spacing.xxl,
   },
-  sectionTitle: {
-    fontSize: FontSizes.lg,
-    fontWeight: FontWeights.bold,
-    marginTop: Spacing.md,
-    marginBottom: Spacing.sm,
+  statusButtonsContainer: {
+    marginBottom: Spacing.md,
+  },
+  statusButtonsContent: {
+    gap: Spacing.sm,
+  },
+  statusButton: {
+    paddingHorizontal: Spacing.md,
+    paddingVertical: Spacing.sm,
+    borderRadius: BorderRadius.md,
+    borderWidth: 1,
+    minWidth: 100,
+    alignItems: "center",
+  },
+  searchDateContainer: {
+    marginBottom: Spacing.md,
+    gap: Spacing.sm,
+  },
+  statusButtonText: {
+    fontSize: FontSizes.sm,
+    fontWeight: FontWeights.semibold,
+  },
+  clearButton: {
+    paddingVertical: Spacing.sm,
+    paddingHorizontal: Spacing.md,
+    borderRadius: BorderRadius.md,
+    borderWidth: 1,
+    alignItems: "center",
+    marginTop: Spacing.sm,
+  },
+  clearButtonText: {
+    fontSize: FontSizes.sm,
+    fontWeight: FontWeights.semibold,
+  },
+  loadingContainer: {
+    paddingVertical: Spacing.xl,
+    alignItems: "center",
+  },
+  emptyText: {
+    fontSize: FontSizes.md,
+    textAlign: "center",
+    paddingVertical: Spacing.xl,
   },
   card: {
     padding: Spacing.md,
@@ -222,27 +383,20 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     marginBottom: Spacing.md,
   },
-  activeCard: {
-    borderWidth: 2,
-  },
   cardHeader: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "flex-start",
     marginBottom: Spacing.sm,
   },
+  cardTitleContainer: {
+    flex: 1,
+    marginRight: Spacing.sm,
+  },
   cardTitle: {
     fontSize: FontSizes.lg,
     fontWeight: FontWeights.semibold,
     marginBottom: Spacing.xs,
-  },
-  cardDate: {
-    fontSize: FontSizes.sm,
-  },
-  cardDescription: {
-    fontSize: FontSizes.md,
-    lineHeight: 22,
-    marginBottom: Spacing.md,
   },
   statusBadge: {
     paddingHorizontal: Spacing.sm,
@@ -254,33 +408,45 @@ const styles = StyleSheet.create({
     fontWeight: FontWeights.semibold,
     color: "#ffffff",
   },
-  cardStats: {
-    flexDirection: "row",
-    justifyContent: "space-around",
+  cardDescription: {
+    fontSize: FontSizes.md,
+    lineHeight: 22,
     marginBottom: Spacing.md,
-    paddingVertical: Spacing.sm,
+  },
+  cardFooter: {
+    marginTop: Spacing.sm,
+    paddingTop: Spacing.sm,
     borderTopWidth: 1,
-    borderBottomWidth: 1,
     borderColor: "rgba(0, 0, 0, 0.1)",
+    gap: Spacing.xs,
   },
-  statItem: {
+  cardDateContainer: {
+    flexDirection: "row",
+    justifyContent: "space-between",
     alignItems: "center",
+    width: "100%",
   },
-  statValue: {
-    fontSize: FontSizes.xl,
+  dateLabel: {
+    fontSize: FontSizes.sm,
+  },
+  dateValue: {
+    fontSize: FontSizes.sm,
+    fontWeight: FontWeights.semibold,
+  },
+  listTitle: {
+    fontSize: FontSizes.lg,
     fontWeight: FontWeights.bold,
-    marginBottom: 2,
+    marginTop: Spacing.md,
+    marginBottom: Spacing.md,
   },
-  statLabel: {
-    fontSize: FontSizes.xs,
-  },
-  button: {
+  actionButton: {
     paddingVertical: Spacing.sm,
     paddingHorizontal: Spacing.md,
     borderRadius: BorderRadius.md,
     alignItems: "center",
+    marginTop: Spacing.md,
   },
-  buttonText: {
+  actionButtonText: {
     fontSize: FontSizes.md,
     fontWeight: FontWeights.semibold,
     color: "#ffffff",

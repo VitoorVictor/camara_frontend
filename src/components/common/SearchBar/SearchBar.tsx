@@ -34,9 +34,7 @@ export function SearchBar({
 
   return (
     <View style={[styles.container, style]}>
-      <View
-        style={[styles.searchContainer, { backgroundColor: colors.background }]}
-      >
+      <View style={[styles.searchContainer, { backgroundColor: "#ffffff" }]}>
         <IconSymbol
           name="magnifyingglass"
           size={28}
@@ -64,24 +62,22 @@ export function SearchBar({
 const styles = StyleSheet.create({
   container: {
     alignItems: "center",
-    paddingHorizontal: Spacing.md,
   },
   searchContainer: {
     flexDirection: "row",
     alignItems: "center",
     paddingHorizontal: Spacing.md,
     paddingVertical: Spacing.sm,
-    borderRadius: BorderRadius.lg,
+    borderRadius: BorderRadius.md,
     shadowColor: "#000",
     shadowOffset: {
       width: 0,
       height: 2,
     },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
     width: "100%",
     gap: Spacing.sm,
+    borderWidth: 1,
+    borderColor: "rgba(0, 0, 0, 0.1)",
   },
   textInput: {
     flex: 1,

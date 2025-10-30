@@ -6,12 +6,14 @@ import { ActionCard } from "@/components/common/ActionCard";
 import { Header } from "@/components/layout/Header";
 import { BorderRadius, Colors, Spacing } from "@/constants/theme";
 import { useAuth } from "@/contexts/AuthContext";
+import { useSession } from "@/contexts/SessionContext";
 import { useColorScheme } from "@/hooks/use-color-scheme";
 
 export default function HomeScreen() {
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme as keyof typeof Colors];
   const { user } = useAuth();
+  const { activeSession, loading } = useSession();
   const isPresident = true;
 
   const handleNotificationPress = () => {
@@ -32,9 +34,9 @@ export default function HomeScreen() {
     router.push("/(tabs)/voting");
   };
 
-  const handleProjectsPress = () => {
-    router.push("/(stacks)/projects");
-  };
+  // const handleProjectsPress = () => {
+  //   router.push("/(stacks)/projects");
+  // };
 
   const handleConfirmVotesPress = () => {
     router.push("/(stacks)/confirm-votes");
@@ -42,6 +44,10 @@ export default function HomeScreen() {
 
   const handleFinalResultsPress = () => {
     router.push("/(stacks)/results");
+  };
+
+  const handleProjectsBySessionPress = () => {
+    router.push("/(stacks)/projects-by-session");
   };
 
   const handleSessionsPress = () => {
@@ -93,17 +99,17 @@ export default function HomeScreen() {
         {isPresident && (
           <>
             <ActionCard
-              title="Todas Sessões"
-              subtitle="Sessões legislativas"
+              title="Sessões"
+              subtitle="Todas as sessões legislativas"
               iconName="calendar"
               onPress={handleSessionsPress}
             />
-            {/* <ActionCard
-              title="Acessar Projetos"
-              subtitle="Seus projetos"
+            <ActionCard
+              title="Projetos"
+              subtitle="Projetos da sessão atual"
               iconName="folder.fill"
-              onPress={handleProjectsPress}
-            /> */}
+              onPress={handleProjectsBySessionPress}
+            />
             <ActionCard
               title="Confirmar Votos"
               subtitle="Finalizar votação da sessão"

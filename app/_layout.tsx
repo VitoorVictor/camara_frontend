@@ -10,6 +10,7 @@ import { StyleSheet, Text, View } from "react-native";
 import "react-native-reanimated";
 
 import { AuthProvider, useAuth } from "@/contexts/AuthContext";
+import { SessionProvider } from "@/contexts/SessionContext";
 import { useColorScheme } from "@/hooks/use-color-scheme";
 import { Colors, FontSizes, FontWeights } from "@/src/constants/theme";
 
@@ -104,12 +105,25 @@ function RootLayoutNav() {
           }}
         />
         <Stack.Screen
+          name="(stacks)/projects-by-session"
+          options={{
+            headerTitle: () => (
+              <CustomHeaderTitle
+                title="Projetos"
+                subtitle="Projetos da sessão atual"
+              />
+            ),
+            headerStyle: { backgroundColor: colors.secondary },
+            headerTintColor: "#ffffff",
+          }}
+        />
+        <Stack.Screen
           name="(stacks)/sessions"
           options={{
             headerTitle: () => (
               <CustomHeaderTitle
                 title="Sessões"
-                subtitle="Gerencie as sessões legislativas"
+                subtitle="Gerencie todas as sessões legislativas"
               />
             ),
             headerStyle: { backgroundColor: colors.secondary },
@@ -122,11 +136,13 @@ function RootLayoutNav() {
   );
 }
 
-// Layout raiz com AuthProvider
+// Layout raiz com AuthProvider e SessionProvider
 export default function RootLayout() {
   return (
     <AuthProvider>
-      <ProtectedRoutes />
+      <SessionProvider>
+        <ProtectedRoutes />
+      </SessionProvider>
     </AuthProvider>
   );
 }

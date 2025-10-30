@@ -24,7 +24,7 @@ export default function ResultsScreen() {
           style={[
             styles.card,
             {
-              backgroundColor: colors.background,
+              backgroundColor: "#ffffff",
               borderColor: colors.border,
             },
           ]}
@@ -47,7 +47,7 @@ export default function ResultsScreen() {
           style={[
             styles.card,
             {
-              backgroundColor: colors.background,
+              backgroundColor: "#ffffff",
               borderColor: colors.border,
             },
           ]}
@@ -67,7 +67,7 @@ export default function ResultsScreen() {
           style={[
             styles.card,
             {
-              backgroundColor: colors.background,
+              backgroundColor: "#ffffff",
               borderColor: colors.border,
             },
           ]}
