@@ -1,3 +1,5 @@
+import { Spinner } from "@/components/common/Spinner";
+import { IconSymbol } from "@/components/ui/icon-symbol";
 import {
   BorderRadius,
   Colors,
@@ -9,10 +11,11 @@ import { useSession } from "@/contexts/SessionContext";
 import { useColorScheme } from "@/hooks/use-color-scheme";
 import { Project, projectsService } from "@/services/projectsService";
 import { formatDate } from "@/utils/formatters";
+import { router } from "expo-router";
 import React, { useEffect, useState } from "react";
 import {
-  ActivityIndicator,
-  ScrollView,
+  FlatList,
+  RefreshControl,
   StyleSheet,
   Text,
   TouchableOpacity,
@@ -22,18 +25,27 @@ import {
 export default function ProjectsBySessionScreen() {
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme as keyof typeof Colors];
-  const { activeSession } = useSession();
+  const {
+    activeSession,
+    loading: sessionLoading,
+    refreshSession,
+  } = useSession();
   const [projects, setProjects] = useState<Project[]>([]);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
 
   useEffect(() => {
-    if (activeSession?.id) {
+    if (activeSession?.id && activeSession.status === "EmAndamento") {
       loadProjects();
+    } else if (!sessionLoading) {
+      // Se não está carregando e não tem sessão, para de carregar
+      setLoading(false);
+      setProjects([]); // Limpa projetos se não há sessão válida
     }
-  }, [activeSession?.id]);
+  }, [activeSession?.id, activeSession?.status, sessionLoading]);
 
   const loadProjects = async () => {
-    if (!activeSession?.id) return;
+    if (!activeSession?.id || activeSession.status !== "EmAndamento") return;
 
     try {
       setLoading(true);
@@ -75,141 +87,221 @@ export default function ProjectsBySessionScreen() {
     }
   };
 
-  return (
-    <View style={styles.container}>
-      <ScrollView
-        style={[styles.content, { backgroundColor: colors.background }]}
-        contentContainerStyle={styles.contentContainer}
-      >
-        {/* Sessão Ativa */}
-        {activeSession && (
-          <View
-            style={[
-              styles.card,
-              styles.activeCard,
-              {
-                borderColor: colors.success,
-              },
-            ]}
-          >
-            <View style={styles.cardHeader}>
-              <View style={{ flex: 1 }}>
-                <Text style={[styles.cardTitle, { color: colors.primaryText }]}>
-                  {activeSession.nome}
-                </Text>
-                <View style={styles.cardDateContainer}>
-                  <Text
-                    style={[styles.cardDate, { color: colors.secondaryText }]}
-                  >
-                    {formatDate(activeSession.data, true)}
-                  </Text>
-                  <View
-                    style={[
-                      styles.statusBadge,
-                      { backgroundColor: colors.success },
-                    ]}
-                  >
-                    <Text style={styles.statusText}>Em Andamento</Text>
-                  </View>
-                </View>
-              </View>
-            </View>
-            <Text
-              style={[styles.cardDescription, { color: colors.secondaryText }]}
-            >
-              {activeSession.descricao}
-            </Text>
-            <View style={styles.cardStats}>
-              <View style={styles.statItem}>
-                <Text style={[styles.statValue, { color: colors.primary }]}>
-                  {projects.length}
-                </Text>
-                <Text
-                  style={[styles.statLabel, { color: colors.secondaryText }]}
-                >
-                  Projetos
-                </Text>
-              </View>
-            </View>
-          </View>
-        )}
+  const handleGoToSessions = () => {
+    router.replace("/(stacks)/sessions");
+  };
 
-        {/* Lista de Projetos */}
-        <Text style={[styles.sectionTitle, { color: colors.primaryText }]}>
-          Projetos da Sessão
-        </Text>
+  const handleRefresh = async () => {
+    setRefreshing(true);
+    try {
+      // Atualiza a sessão no contexto
+      await refreshSession();
+      // O useEffect vai detectar a mudança no activeSession e recarregar os projetos automaticamente
+    } catch (error) {
+      console.error("Erro ao atualizar:", error);
+    } finally {
+      setRefreshing(false);
+    }
+  };
 
-        {loading ? (
-          <View style={styles.loadingContainer}>
-            <ActivityIndicator size="large" color={colors.primary} />
-          </View>
-        ) : projects.length === 0 ? (
-          <Text style={[styles.emptyText, { color: colors.secondaryText }]}>
-            Nenhum projeto cadastrado nesta sessão
+  const renderProjectCard = ({ item: project }: { item: Project }) => (
+    <TouchableOpacity
+      style={[
+        styles.card,
+        styles.projectCard,
+        {
+          backgroundColor: "#ffffff",
+          borderColor: colors.border,
+        },
+      ]}
+    >
+      <View style={styles.cardHeader}>
+        <View style={styles.projectTitleContainer}>
+          <Text style={[styles.cardTitle, { color: colors.primaryText }]}>
+            {project.titulo}
           </Text>
-        ) : (
-          projects.map((project) => (
-            <TouchableOpacity
-              key={project.id}
-              style={[
-                styles.card,
-                styles.projectCard,
-                {
-                  backgroundColor: "#ffffff",
-                  borderColor: colors.border,
-                },
-              ]}
-            >
-              <View style={styles.cardHeader}>
-                <View style={styles.projectTitleContainer}>
-                  <Text
-                    style={[styles.cardTitle, { color: colors.primaryText }]}
-                  >
-                    {project.titulo}
-                  </Text>
-                </View>
+        </View>
+        <View
+          style={[
+            styles.statusBadge,
+            { backgroundColor: getStatusBadgeColor(project.status) },
+          ]}
+        >
+          <Text style={styles.statusText}>
+            {getProjetoStatusLabel(project.status)}
+          </Text>
+        </View>
+      </View>
+      <Text style={[styles.cardDescription, { color: colors.secondaryText }]}>
+        {project.descricao}
+      </Text>
+      <View style={styles.projectFooter}>
+        <Text style={[styles.authorText, { color: colors.secondaryText }]}>
+          Autor: {project.autorNome} {project.autorSobrenome}
+        </Text>
+        <Text style={[styles.dateText, { color: colors.disabledText }]}>
+          {new Date(project.criadoEm).toLocaleDateString("pt-BR")}
+        </Text>
+      </View>
+    </TouchableOpacity>
+  );
+
+  const renderListHeader = () => (
+    <>
+      {/* Sessão Ativa */}
+      {activeSession && (
+        <View
+          style={[
+            styles.card,
+            styles.activeCard,
+            {
+              borderColor: colors.success,
+            },
+          ]}
+        >
+          <View style={styles.cardHeader}>
+            <View style={{ flex: 1 }}>
+              <Text style={[styles.cardTitle, { color: colors.primaryText }]}>
+                {activeSession.nome}
+              </Text>
+              <View style={styles.cardDateContainer}>
+                <Text
+                  style={[styles.cardDate, { color: colors.secondaryText }]}
+                >
+                  {formatDate(activeSession.data, true)}
+                </Text>
                 <View
                   style={[
                     styles.statusBadge,
-                    { backgroundColor: getStatusBadgeColor(project.status) },
+                    { backgroundColor: colors.success },
                   ]}
                 >
-                  <Text style={styles.statusText}>
-                    {getProjetoStatusLabel(project.status)}
-                  </Text>
+                  <Text style={styles.statusText}>Em Andamento</Text>
                 </View>
               </View>
-              <Text
-                style={[
-                  styles.cardDescription,
-                  { color: colors.secondaryText },
-                ]}
-              >
-                {project.descricao}
+            </View>
+          </View>
+          <Text
+            style={[styles.cardDescription, { color: colors.secondaryText }]}
+          >
+            {activeSession.descricao}
+          </Text>
+          <View style={styles.cardStats}>
+            <View style={styles.statItem}>
+              <Text style={[styles.statValue, { color: colors.primary }]}>
+                {projects.length}
               </Text>
-              <View style={styles.projectFooter}>
-                <Text
-                  style={[styles.authorText, { color: colors.secondaryText }]}
-                >
-                  Autor: {project.autorNome} {project.autorSobrenome}
-                </Text>
-                <Text style={[styles.dateText, { color: colors.disabledText }]}>
-                  {new Date(project.criadoEm).toLocaleDateString("pt-BR")}
-                </Text>
-              </View>
+              <Text style={[styles.statLabel, { color: colors.secondaryText }]}>
+                Projetos
+              </Text>
+            </View>
+          </View>
+        </View>
+      )}
+
+      {/* Lista de Projetos */}
+      <Text style={[styles.sectionTitle, { color: colors.primaryText }]}>
+        Projetos da Sessão
+      </Text>
+    </>
+  );
+
+  const renderEmpty = () => {
+    if (loading) {
+      return (
+        <View style={styles.loadingContainer}>
+          <Spinner />
+        </View>
+      );
+    }
+    return (
+      <Text style={[styles.emptyText, { color: colors.secondaryText }]}>
+        Nenhum projeto cadastrado nesta sessão
+      </Text>
+    );
+  };
+
+  // Mostra spinner enquanto carrega sessão
+  if (sessionLoading) {
+    return (
+      <View style={[styles.container, { backgroundColor: colors.background }]}>
+        <Spinner />
+      </View>
+    );
+  }
+
+  // Se não há sessão ativa, mostra mensagem
+  if (!activeSession) {
+    return (
+      <View style={[styles.container, { backgroundColor: colors.background }]}>
+        <View style={styles.emptyContainer}>
+          <View
+            style={[
+              styles.emptyCard,
+              {
+                backgroundColor: "#ffffff",
+                borderColor: colors.border,
+              },
+            ]}
+          >
+            <View style={styles.emptyIconContainer}>
+              <IconSymbol
+                name="calendar"
+                size={64}
+                color={colors.disabledText}
+              />
+            </View>
+            <Text style={[styles.emptyTitle, { color: colors.primaryText }]}>
+              Nenhuma Sessão Ativa
+            </Text>
+            <Text
+              style={[styles.emptyMessage, { color: colors.secondaryText }]}
+            >
+              Não há uma sessão em andamento no momento.{"\n"}É necessário abrir
+              uma sessão na tela de Sessões para visualizar os projetos.
+            </Text>
+            <TouchableOpacity
+              style={[
+                styles.goToSessionsButton,
+                { backgroundColor: colors.primary },
+              ]}
+              onPress={handleGoToSessions}
+              activeOpacity={0.8}
+            >
+              <IconSymbol name="calendar" size={20} color="#ffffff" />
+              <Text style={styles.goToSessionsButtonText}>Ir para Sessões</Text>
             </TouchableOpacity>
-          ))
-        )}
-      </ScrollView>
+          </View>
+        </View>
+      </View>
+    );
+  }
+
+  return (
+    <View style={[styles.container, { backgroundColor: colors.background }]}>
+      <FlatList
+        data={projects}
+        renderItem={renderProjectCard}
+        keyExtractor={(item) => item.id}
+        ListHeaderComponent={renderListHeader}
+        ListEmptyComponent={renderEmpty}
+        contentContainerStyle={styles.contentContainer}
+        showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={handleRefresh}
+            colors={[colors.primary]}
+            tintColor={colors.primary}
+          />
+        }
+      />
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
-    flex: 1,
-  },
-  content: {
     flex: 1,
   },
   contentContainer: {
@@ -327,5 +419,49 @@ const styles = StyleSheet.create({
   },
   dateText: {
     fontSize: FontSizes.xs,
+  },
+  emptyContainer: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    padding: Spacing.lg,
+  },
+  emptyCard: {
+    width: "100%",
+    maxWidth: 400,
+    padding: Spacing.xl,
+    borderRadius: BorderRadius.xl,
+    borderWidth: 1,
+    alignItems: "center",
+  },
+  emptyIconContainer: {
+    marginBottom: Spacing.lg,
+  },
+  emptyTitle: {
+    fontSize: FontSizes.xl,
+    fontWeight: FontWeights.bold,
+    marginBottom: Spacing.md,
+    textAlign: "center",
+  },
+  emptyMessage: {
+    fontSize: FontSizes.md,
+    textAlign: "center",
+    lineHeight: 22,
+    marginBottom: Spacing.xl,
+  },
+  goToSessionsButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    paddingVertical: Spacing.md,
+    paddingHorizontal: Spacing.xl,
+    borderRadius: BorderRadius.md,
+    gap: Spacing.sm,
+    minWidth: 200,
+  },
+  goToSessionsButtonText: {
+    fontSize: FontSizes.md,
+    fontWeight: FontWeights.semibold,
+    color: "#ffffff",
   },
 });

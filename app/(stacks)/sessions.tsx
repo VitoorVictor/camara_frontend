@@ -9,6 +9,7 @@ import {
   FontWeights,
   Spacing,
 } from "@/constants/theme";
+import { useSession } from "@/contexts/SessionContext";
 import { useColorScheme } from "@/hooks/use-color-scheme";
 import {
   ListSessionsParams,
@@ -31,6 +32,7 @@ const STATUS_OPTIONS = ["EmAndamento", "Agendada", "Encerrada", "Cancelada"];
 export default function SessionsScreen() {
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme as keyof typeof Colors];
+  const { refreshSession } = useSession(); // Para atualizar a sessão ativa após abrir/encerrar
   const [sessions, setSessions] = useState<Session[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
@@ -203,6 +205,8 @@ export default function SessionsScreen() {
           setConfirmationModal((prev) => ({ ...prev, visible: false }));
           await sessionsService.start(id);
           resetAndLoadSessions(); // Recarrega a lista de sessões
+          // Atualiza a sessão ativa no contexto
+          await refreshSession();
         } catch (error) {
           console.error("Erro ao abrir sessão:", error);
           setConfirmationModal({
@@ -232,6 +236,8 @@ export default function SessionsScreen() {
           setConfirmationModal((prev) => ({ ...prev, visible: false }));
           await sessionsService.finish(id);
           resetAndLoadSessions(); // Recarrega a lista de sessões
+          // Atualiza a sessão ativa no contexto (vai limpar pois não há mais sessão ativa)
+          await refreshSession();
         } catch (error) {
           console.error("Erro ao encerrar sessão:", error);
           setConfirmationModal({
