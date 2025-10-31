@@ -1,5 +1,7 @@
+import { ConfirmationModal } from "@/components/common/ConfirmationModal";
 import { DatePicker } from "@/components/common/DatePicker";
 import { SearchBar } from "@/components/common/SearchBar";
+import { Spinner } from "@/components/common/Spinner";
 import {
   BorderRadius,
   Colors,
@@ -7,42 +9,66 @@ import {
   FontWeights,
   Spacing,
 } from "@/constants/theme";
-import {
-  SessaoStatusEnum,
-  getSessaoStatusLabel,
-} from "@/enums/SessaoStatusEnum";
 import { useColorScheme } from "@/hooks/use-color-scheme";
 import {
   ListSessionsParams,
   Session,
   sessionsService,
 } from "@/services/sessionsService";
-import React, { useEffect, useState } from "react";
+import { formatDate } from "@/src/utils/formatters";
+import React, { useCallback, useEffect, useState } from "react";
 import {
-  ActivityIndicator,
-  ScrollView,
+  FlatList,
+  RefreshControl,
   StyleSheet,
   Text,
   TouchableOpacity,
   View,
 } from "react-native";
 
+const STATUS_OPTIONS = ["EmAndamento", "Agendada", "Encerrada", "Cancelada"];
+
 export default function SessionsScreen() {
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme as keyof typeof Colors];
   const [sessions, setSessions] = useState<Session[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [searchLoading, setSearchLoading] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
   const [filters, setFilters] = useState<ListSessionsParams>({});
+  const [offset, setOffset] = useState(0);
+  const [hasMore, setHasMore] = useState(true);
+  const [confirmationModal, setConfirmationModal] = useState<{
+    visible: boolean;
+    title: string;
+    message: string;
+    confirmText: string;
+    onConfirm: () => void;
+    type?: "default" | "danger";
+  }>({
+    visible: false,
+    title: "",
+    message: "",
+    confirmText: "Confirmar",
+    onConfirm: () => {},
+    type: "default",
+  });
+  const limit = 10;
 
   useEffect(() => {
-    loadSessions();
+    resetAndLoadSessions();
   }, []);
 
-  const loadSessions = async (params?: ListSessionsParams) => {
+  const resetAndLoadSessions = async () => {
     try {
       setLoading(true);
-      const data = await sessionsService.listByCamara(params || filters);
-      setSessions(data);
+      setOffset(0);
+      setHasMore(true);
+      const data = await sessionsService.listByCamara(limit, 0, filters);
+      setSessions(data.items);
+      setHasMore(data.hasMore);
+      setOffset(limit);
     } catch (error) {
       console.error("Erro ao carregar sessões:", error);
     } finally {
@@ -50,88 +76,275 @@ export default function SessionsScreen() {
     }
   };
 
-  const handleSearch = (text: string) => {
+  const loadMoreSessions = async () => {
+    if (loadingMore || !hasMore) return;
+
+    try {
+      setLoadingMore(true);
+      const data = await sessionsService.listByCamara(limit, offset, filters);
+      setSessions((prev) => [...prev, ...data.items]);
+      setHasMore(data.hasMore);
+      setOffset((prev) => prev + limit);
+    } catch (error) {
+      console.error("Erro ao carregar mais sessões:", error);
+    } finally {
+      setLoadingMore(false);
+    }
+  };
+
+  const handleSearch = async (text: string) => {
+    setSearchLoading(true);
     const newFilters = { ...filters, nome: text || undefined };
     setFilters(newFilters);
-    loadSessions(newFilters);
+    await applyFilters(newFilters);
+    setSearchLoading(false);
   };
 
-  const handleDateChange = (date: string) => {
+  const handleDateChange = async (date: string) => {
     const newFilters = { ...filters, data: date || undefined };
     setFilters(newFilters);
-    loadSessions(newFilters);
+    await applyFilters(newFilters);
   };
 
-  const handleStatusChange = (status: SessaoStatusEnum | "all") => {
+  const handleClearSearch = async () => {
+    const newFilters = { ...filters, nome: undefined };
+    setFilters(newFilters);
+    await applyFilters(newFilters);
+  };
+
+  const handleClearDate = async () => {
+    const newFilters = { ...filters, data: undefined };
+    setFilters(newFilters);
+    await applyFilters(newFilters);
+  };
+
+  const handleClearAll = async () => {
+    const emptyFilters: ListSessionsParams = {};
+    setFilters(emptyFilters);
+    await applyFilters(emptyFilters);
+  };
+
+  const handleStatusChange = (status: string) => {
     const newFilters = {
       ...filters,
       status: status === "all" ? undefined : status,
     };
     setFilters(newFilters);
-    loadSessions(newFilters);
+    applyFilters(newFilters);
+  };
+
+  const applyFilters = async (newFilters: ListSessionsParams) => {
+    try {
+      setLoading(true);
+      setOffset(0);
+      setHasMore(true);
+      const data = await sessionsService.listByCamara(limit, 0, newFilters);
+      setSessions(data.items);
+      setHasMore(data.hasMore);
+      setOffset(limit);
+    } catch (error) {
+      console.error("Erro ao aplicar filtros:", error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleRefresh = async () => {
+    setRefreshing(true);
+    await applyFilters(filters);
+    setRefreshing(false);
   };
 
   const clearFilters = () => {
     const emptyFilters: ListSessionsParams = {};
     setFilters(emptyFilters);
-    loadSessions(emptyFilters);
+    applyFilters(emptyFilters);
   };
 
-  const getStatusBadgeColor = (status: SessaoStatusEnum) => {
+  const getStatusBadgeColor = (status: string) => {
     switch (status) {
-      case SessaoStatusEnum.EmAndamento:
+      case "EmAndamento":
         return colors.success;
-      case SessaoStatusEnum.Agendada:
+      case "Agendada":
         return colors.warning;
-      case SessaoStatusEnum.Encerrada:
+      case "Encerrada":
         return colors.inactive;
-      case SessaoStatusEnum.Cancelada:
+      case "Cancelada":
         return colors.error;
       default:
         return colors.inactive;
     }
   };
 
-  const formatDate = (dateString: string) => {
-    const date = new Date(dateString);
-    return date.toLocaleDateString("pt-BR", {
-      day: "2-digit",
-      month: "2-digit",
-      year: "numeric",
+  const getSessionStatusLabel = (status: string) => {
+    switch (status) {
+      case "EmAndamento":
+        return "Em Andamento";
+      case "Agendada":
+        return "Agendada";
+      case "Encerrada":
+        return "Encerrada";
+      case "Cancelada":
+        return "Cancelada";
+      default:
+        return "Não definido";
+    }
+  };
+
+  const handleOpenSession = async (id: string, sessionName: string) => {
+    setConfirmationModal({
+      visible: true,
+      title: "Confirmar Abertura",
+      message: `Deseja realmente abrir a sessão "${sessionName}"?`,
+      confirmText: "Abrir",
+      type: "default",
+      onConfirm: async () => {
+        try {
+          setConfirmationModal((prev) => ({ ...prev, visible: false }));
+          await sessionsService.start(id);
+          resetAndLoadSessions(); // Recarrega a lista de sessões
+        } catch (error) {
+          console.error("Erro ao abrir sessão:", error);
+          setConfirmationModal({
+            visible: true,
+            title: "Erro",
+            message: "Não foi possível abrir a sessão. Tente novamente.",
+            confirmText: "OK",
+            type: "danger",
+            onConfirm: () => {
+              setConfirmationModal((prev) => ({ ...prev, visible: false }));
+            },
+          });
+        }
+      },
     });
   };
 
-  const handleOpenSession = async (id: string) => {
-    try {
-      await sessionsService.start(id);
-      loadSessions(); // Recarrega a lista de sessões
-    } catch (error) {
-      console.error("Erro ao abrir sessão:", error);
+  const handleFinishSession = async (id: string, sessionName: string) => {
+    setConfirmationModal({
+      visible: true,
+      title: "Confirmar Encerramento",
+      message: `Deseja realmente encerrar a sessão "${sessionName}"?\n\nEsta ação não pode ser desfeita.`,
+      confirmText: "Encerrar",
+      type: "danger",
+      onConfirm: async () => {
+        try {
+          setConfirmationModal((prev) => ({ ...prev, visible: false }));
+          await sessionsService.finish(id);
+          resetAndLoadSessions(); // Recarrega a lista de sessões
+        } catch (error) {
+          console.error("Erro ao encerrar sessão:", error);
+          setConfirmationModal({
+            visible: true,
+            title: "Erro",
+            message: "Não foi possível encerrar a sessão. Tente novamente.",
+            confirmText: "OK",
+            type: "danger",
+            onConfirm: () => {
+              setConfirmationModal((prev) => ({ ...prev, visible: false }));
+            },
+          });
+        }
+      },
+    });
+  };
+
+  const handleEndReached = () => {
+    if (!loadingMore && hasMore) {
+      loadMoreSessions();
     }
   };
 
-  const handleFinishSession = async (id: string) => {
-    try {
-      await sessionsService.finish(id);
-      loadSessions(); // Recarrega a lista de sessões
-    } catch (error) {
-      console.error("Erro ao encerrar sessão:", error);
-    }
-  };
-
-  return (
-    <View style={styles.container}>
-      <ScrollView
-        style={[styles.content, { backgroundColor: colors.background }]}
-        contentContainerStyle={styles.contentContainer}
+  const renderSessionCard = useCallback(
+    ({ item: session }: { item: Session }) => (
+      <TouchableOpacity
+        style={[
+          styles.card,
+          {
+            backgroundColor: "#ffffff",
+            borderColor: colors.border,
+          },
+        ]}
       >
-        {/* Filtro por status */}
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          style={styles.statusButtonsContainer}
-          contentContainerStyle={styles.statusButtonsContent}
-        >
+        <View style={styles.cardHeader}>
+          <View style={styles.cardTitleContainer}>
+            <Text style={[styles.cardTitle, { color: colors.primaryText }]}>
+              {session.nome}
+            </Text>
+          </View>
+          <View
+            style={[
+              styles.statusBadge,
+              { backgroundColor: getStatusBadgeColor(session.status) },
+            ]}
+          >
+            <Text style={styles.statusText}>
+              {getSessionStatusLabel(session.status)}
+            </Text>
+          </View>
+        </View>
+
+        <Text style={[styles.cardDescription, { color: colors.secondaryText }]}>
+          {session.descricao}
+        </Text>
+
+        <View style={styles.cardFooter}>
+          <View style={styles.cardDateContainer}>
+            <Text style={[styles.dateLabel, { color: colors.secondaryText }]}>
+              Data:
+            </Text>
+            <Text style={[styles.dateValue, { color: colors.primaryText }]}>
+              {formatDate(session.data)}
+            </Text>
+          </View>
+          <View style={styles.cardDateContainer}>
+            <Text style={[styles.dateLabel, { color: colors.secondaryText }]}>
+              Aberta em:
+            </Text>
+            <Text style={[styles.dateValue, { color: colors.primaryText }]}>
+              {new Date(session.abertoEm).toLocaleDateString("pt-BR")}
+            </Text>
+          </View>
+        </View>
+
+        {/* Botões de ação */}
+        {session.status === "Agendada" && (
+          <TouchableOpacity
+            style={[styles.actionButton, { backgroundColor: colors.primary }]}
+            onPress={() => handleOpenSession(session.id, session.nome)}
+          >
+            <Text style={styles.actionButtonText}>Abrir Sessão</Text>
+          </TouchableOpacity>
+        )}
+
+        {session.status === "EmAndamento" && (
+          <TouchableOpacity
+            style={[styles.actionButton, { backgroundColor: colors.error }]}
+            onPress={() => handleFinishSession(session.id, session.nome)}
+          >
+            <Text style={styles.actionButtonText}>Encerrar Sessão</Text>
+          </TouchableOpacity>
+        )}
+      </TouchableOpacity>
+    ),
+    [colors, handleOpenSession, handleFinishSession]
+  );
+
+  const renderFooter = () => {
+    if (!loadingMore) return null;
+    return <Spinner size="small" />;
+  };
+
+  const renderListHeader = () => (
+    <>
+      {/* Filtro por status */}
+      <FlatList
+        horizontal
+        data={STATUS_OPTIONS}
+        showsHorizontalScrollIndicator={false}
+        keyExtractor={(item) => item}
+        contentContainerStyle={styles.statusButtonsContent}
+        ListHeaderComponent={
           <TouchableOpacity
             style={[
               styles.statusButton,
@@ -160,165 +373,109 @@ export default function SessionsScreen() {
               Todos
             </Text>
           </TouchableOpacity>
-          {Object.values(SessaoStatusEnum)
-            .filter((v) => typeof v === "number")
-            .map((status) => (
-              <TouchableOpacity
-                key={status}
-                style={[
-                  styles.statusButton,
-                  {
-                    backgroundColor:
-                      filters.status === status ? colors.primary : "#ffffff",
-                    borderColor:
-                      filters.status === status
-                        ? colors.primary
-                        : "rgba(0, 0, 0, 0.1)",
-                  },
-                ]}
-                onPress={() => handleStatusChange(status as SessaoStatusEnum)}
-              >
-                <Text
-                  style={[
-                    styles.statusButtonText,
-                    {
-                      color:
-                        filters.status === status
-                          ? "#ffffff"
-                          : colors.primaryText,
-                    },
-                  ]}
-                >
-                  {getSessaoStatusLabel(status as SessaoStatusEnum)}
-                </Text>
-              </TouchableOpacity>
-            ))}
-        </ScrollView>
-
-        {/* Pesquisa e Data */}
-        <View style={styles.searchDateContainer}>
-          <SearchBar
-            placeholder="Pesquisar por nome da sessão"
-            value={filters.nome}
-            onChangeText={(text) => setFilters({ ...filters, nome: text })}
-            onSearch={handleSearch}
-          />
-          <DatePicker
-            value={filters.data}
-            onChange={handleDateChange}
-            placeholder="Data"
-          />
-        </View>
-
-        {/* Lista de Sessões */}
-        <Text style={[styles.listTitle, { color: colors.primaryText }]}>
-          Sessões ({sessions.length})
-        </Text>
-
-        {loading ? (
-          <View style={styles.loadingContainer}>
-            <ActivityIndicator size="large" color={colors.primary} />
-          </View>
-        ) : sessions.length === 0 ? (
-          <Text style={[styles.emptyText, { color: colors.secondaryText }]}>
-            Nenhuma sessão encontrada
-          </Text>
-        ) : (
-          sessions.map((session) => (
-            <TouchableOpacity
-              key={session.id}
+        }
+        renderItem={({ item: status }) => (
+          <TouchableOpacity
+            key={status}
+            style={[
+              styles.statusButton,
+              {
+                backgroundColor:
+                  filters.status === status ? colors.primary : "#ffffff",
+                borderColor:
+                  filters.status === status
+                    ? colors.primary
+                    : "rgba(0, 0, 0, 0.1)",
+              },
+            ]}
+            onPress={() => handleStatusChange(status)}
+          >
+            <Text
               style={[
-                styles.card,
+                styles.statusButtonText,
                 {
-                  backgroundColor: "#ffffff",
-                  borderColor: colors.border,
+                  color:
+                    filters.status === status ? "#ffffff" : colors.primaryText,
                 },
               ]}
             >
-              <View style={styles.cardHeader}>
-                <View style={styles.cardTitleContainer}>
-                  <Text
-                    style={[styles.cardTitle, { color: colors.primaryText }]}
-                  >
-                    {session.nome}
-                  </Text>
-                </View>
-                <View
-                  style={[
-                    styles.statusBadge,
-                    { backgroundColor: getStatusBadgeColor(session.status) },
-                  ]}
-                >
-                  <Text style={styles.statusText}>
-                    {getSessaoStatusLabel(session.status)}
-                  </Text>
-                </View>
-              </View>
-
-              <Text
-                style={[
-                  styles.cardDescription,
-                  { color: colors.secondaryText },
-                ]}
-              >
-                {session.descricao}
-              </Text>
-
-              <View style={styles.cardFooter}>
-                <View style={styles.cardDateContainer}>
-                  <Text
-                    style={[styles.dateLabel, { color: colors.secondaryText }]}
-                  >
-                    Data:
-                  </Text>
-                  <Text
-                    style={[styles.dateValue, { color: colors.primaryText }]}
-                  >
-                    {formatDate(session.data)}
-                  </Text>
-                </View>
-                <View style={styles.cardDateContainer}>
-                  <Text
-                    style={[styles.dateLabel, { color: colors.secondaryText }]}
-                  >
-                    Aberta em:
-                  </Text>
-                  <Text
-                    style={[styles.dateValue, { color: colors.primaryText }]}
-                  >
-                    {new Date(session.abertoEm).toLocaleDateString("pt-BR")}
-                  </Text>
-                </View>
-              </View>
-
-              {/* Botões de ação */}
-              {session.status === SessaoStatusEnum.Agendada && (
-                <TouchableOpacity
-                  style={[
-                    styles.actionButton,
-                    { backgroundColor: colors.primary },
-                  ]}
-                  onPress={() => handleOpenSession(session.id)}
-                >
-                  <Text style={styles.actionButtonText}>Abrir Sessão</Text>
-                </TouchableOpacity>
-              )}
-
-              {session.status === SessaoStatusEnum.EmAndamento && (
-                <TouchableOpacity
-                  style={[
-                    styles.actionButton,
-                    { backgroundColor: colors.error },
-                  ]}
-                  onPress={() => handleFinishSession(session.id)}
-                >
-                  <Text style={styles.actionButtonText}>Encerrar Sessão</Text>
-                </TouchableOpacity>
-              )}
-            </TouchableOpacity>
-          ))
+              {getSessionStatusLabel(status)}
+            </Text>
+          </TouchableOpacity>
         )}
-      </ScrollView>
+        style={styles.statusButtonsContainer}
+      />
+
+      {/* Pesquisa e Data */}
+      <View style={styles.searchDateContainer}>
+        <SearchBar
+          placeholder="Pesquisar por nome da sessão"
+          value={filters.nome}
+          onSearch={handleSearch}
+          onClear={handleClearSearch}
+          onClearAll={handleClearAll}
+          loading={searchLoading}
+        />
+        <DatePicker
+          value={filters.data}
+          onChange={handleDateChange}
+          onClear={handleClearDate}
+          placeholder="Data"
+        />
+      </View>
+
+      {/* Lista de Sessões */}
+      <Text style={[styles.listTitle, { color: colors.primaryText }]}>
+        Sessões ({sessions.length})
+      </Text>
+    </>
+  );
+
+  const renderEmpty = () => (
+    <Text style={[styles.emptyText, { color: colors.secondaryText }]}>
+      {loading ? "" : "Nenhuma sessão encontrada"}
+    </Text>
+  );
+
+  return (
+    <View style={[styles.container, { backgroundColor: colors.background }]}>
+      {loading && sessions.length === 0 ? (
+        <Spinner />
+      ) : (
+        <FlatList
+          data={sessions}
+          renderItem={renderSessionCard}
+          keyExtractor={(item) => item.id}
+          ListHeaderComponent={renderListHeader}
+          ListEmptyComponent={renderEmpty}
+          ListFooterComponent={renderFooter}
+          onEndReached={handleEndReached}
+          onEndReachedThreshold={0.3}
+          contentContainerStyle={styles.contentContainer}
+          showsVerticalScrollIndicator={false}
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={handleRefresh}
+              colors={[colors.primary]}
+              tintColor={colors.primary}
+            />
+          }
+        />
+      )}
+
+      <ConfirmationModal
+        visible={confirmationModal.visible}
+        title={confirmationModal.title}
+        message={confirmationModal.message}
+        confirmText={confirmationModal.confirmText}
+        cancelText="Cancelar"
+        type={confirmationModal.type}
+        onConfirm={confirmationModal.onConfirm}
+        onCancel={() =>
+          setConfirmationModal((prev) => ({ ...prev, visible: false }))
+        }
+      />
     </View>
   );
 }

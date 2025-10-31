@@ -42,15 +42,16 @@ function ProtectedRoutes() {
     if (loading) return; // Aguarda carregar dados do AsyncStorage
 
     const inAuthGroup = segments[0] === "(auth)";
+    const inTabsGroup = segments[0] === "(tabs)";
+    const inStacksGroup = segments[0] === "(stacks)";
 
-    if (!isAuthenticated && !inAuthGroup) {
+    // Rotas de auth sempre acessíveis (não redireciona usuários autenticados)
+    // Apenas protege rotas de tabs e stacks quando não autenticado
+    if (!isAuthenticated && (inTabsGroup || inStacksGroup)) {
       // Usuário não autenticado tentando acessar rota protegida
       router.replace("/(auth)/login");
-    } else if (isAuthenticated && inAuthGroup) {
-      // Usuário autenticado tentando acessar tela de login
-      router.replace("/(tabs)");
     }
-  }, [isAuthenticated, loading, segments]);
+  }, [isAuthenticated, loading, segments, router]);
 
   return <RootLayoutNav />;
 }

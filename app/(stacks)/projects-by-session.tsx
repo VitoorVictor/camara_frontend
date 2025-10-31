@@ -6,12 +6,9 @@ import {
   Spacing,
 } from "@/constants/theme";
 import { useSession } from "@/contexts/SessionContext";
-import {
-  ProjetoStatusEnum,
-  getProjetoStatusLabel,
-} from "@/enums/ProjetoStatusEnum";
 import { useColorScheme } from "@/hooks/use-color-scheme";
 import { Project, projectsService } from "@/services/projectsService";
+import { formatDate } from "@/utils/formatters";
 import React, { useEffect, useState } from "react";
 import {
   ActivityIndicator,
@@ -49,18 +46,32 @@ export default function ProjectsBySessionScreen() {
     }
   };
 
-  const getStatusBadgeColor = (status: ProjetoStatusEnum) => {
+  const getStatusBadgeColor = (status: string) => {
     switch (status) {
-      case ProjetoStatusEnum.Aprovado:
+      case "Aprovado":
         return colors.success;
-      case ProjetoStatusEnum.Rejeitado:
+      case "Rejeitado":
         return colors.error;
-      case ProjetoStatusEnum.EmVotacao:
+      case "EmVotacao":
         return colors.warning;
-      case ProjetoStatusEnum.Apresentado:
+      case "Apresentado":
         return colors.primary;
       default:
         return colors.inactive;
+    }
+  };
+  const getProjetoStatusLabel = (status: string) => {
+    switch (status) {
+      case "Aprovado":
+        return "Aprovado";
+      case "Rejeitado":
+        return "Rejeitado";
+      case "EmVotacao":
+        return "Em Votação";
+      case "Apresentado":
+        return "Apresentado";
+      default:
+        return "Não definido";
     }
   };
 
@@ -82,7 +93,7 @@ export default function ProjectsBySessionScreen() {
             ]}
           >
             <View style={styles.cardHeader}>
-              <View>
+              <View style={{ flex: 1 }}>
                 <Text style={[styles.cardTitle, { color: colors.primaryText }]}>
                   {activeSession.nome}
                 </Text>
@@ -90,7 +101,7 @@ export default function ProjectsBySessionScreen() {
                   <Text
                     style={[styles.cardDate, { color: colors.secondaryText }]}
                   >
-                    {activeSession.data}
+                    {formatDate(activeSession.data, true)}
                   </Text>
                   <View
                     style={[

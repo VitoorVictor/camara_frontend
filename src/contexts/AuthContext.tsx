@@ -33,15 +33,29 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
   async function loadStorageData() {
     try {
+      setLoading(true);
+      // Verifica se há token válido no AsyncStorage
       const isAuth = await authService.isAuthenticated();
+
       if (isAuth) {
+        // Token válido encontrado, restaura os dados do usuário
         const storedUser = await authService.getCurrentUser();
         if (storedUser) {
           setUser(storedUser);
+        } else {
+          // Se não houver dados do usuário mas o token existe, limpa tudo
+          await authService.logout();
         }
+      } else {
+        // Token inválido ou expirado, limpa os dados
+        await authService.logout();
+        setUser(null);
       }
     } catch (error) {
       console.error("Erro ao carregar dados do usuário:", error);
+      // Em caso de erro, limpa os dados para garantir segurança
+      await authService.logout();
+      setUser(null);
     } finally {
       setLoading(false);
     }

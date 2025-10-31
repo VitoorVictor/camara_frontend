@@ -29,6 +29,8 @@ const MAPPING = {
   magnifyingglass: "search",
   "chart.bar.fill": "bar-chart",
   "calendar": "calendar-month",
+  xmark: "close",
+  "xmark.circle.fill": "cancel",
 } as IconMapping;
 
 /**
