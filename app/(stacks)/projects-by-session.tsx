@@ -1,3 +1,4 @@
+import { ConfirmationModal } from "@/components/common/ConfirmationModal";
 import { Spinner } from "@/components/common/Spinner";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import {
@@ -14,6 +15,7 @@ import { formatDate } from "@/utils/formatters";
 import { router } from "expo-router";
 import React, { useEffect, useState } from "react";
 import {
+  Alert,
   FlatList,
   RefreshControl,
   StyleSheet,
@@ -33,6 +35,18 @@ export default function ProjectsBySessionScreen() {
   const [projects, setProjects] = useState<Project[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [confirmationModal, setConfirmationModal] = useState<{
+    visible: boolean;
+    title: string;
+    message: string;
+    projetoId: string | null;
+  }>({
+    visible: false,
+    title: "",
+    message: "",
+    projetoId: null,
+  });
+  const [updatingStatus, setUpdatingStatus] = useState(false);
 
   useEffect(() => {
     if (activeSession?.id && activeSession.status === "EmAndamento") {
@@ -68,6 +82,8 @@ export default function ProjectsBySessionScreen() {
         return colors.warning;
       case "Apresentado":
         return colors.primary;
+      case "Cancelado":
+        return colors.inactive;
       default:
         return colors.inactive;
     }
@@ -82,6 +98,8 @@ export default function ProjectsBySessionScreen() {
         return "Em Votação";
       case "Apresentado":
         return "Apresentado";
+      case "Cancelado":
+        return "Cancelado";
       default:
         return "Não definido";
     }
@@ -103,6 +121,64 @@ export default function ProjectsBySessionScreen() {
       setRefreshing(false);
     }
   };
+
+  const handleOpenVotingConfirmation = (
+    projectId: string,
+    projectTitle: string
+  ) => {
+    setConfirmationModal({
+      visible: true,
+      title: "Enviar para Votação",
+      message: `Deseja enviar o projeto "${projectTitle}" para votação?`,
+      projetoId: projectId,
+    });
+  };
+
+  const handleCloseConfirmation = () => {
+    setConfirmationModal({
+      visible: false,
+      title: "",
+      message: "",
+      projetoId: null,
+    });
+  };
+
+  const handleConfirmStatusUpdate = async () => {
+    if (!confirmationModal.projetoId) return;
+
+    try {
+      setUpdatingStatus(true);
+      await projectsService.updateStatus(
+        confirmationModal.projetoId,
+        "EmVotacao"
+      );
+
+      // Atualiza o status do projeto na lista local
+      setProjects((prevProjects) =>
+        prevProjects.map((project) =>
+          project.id === confirmationModal.projetoId
+            ? { ...project, status: "EmVotacao" }
+            : project
+        )
+      );
+
+      handleCloseConfirmation();
+      Alert.alert("Sucesso", "Status do projeto atualizado com sucesso!");
+    } catch (error: any) {
+      console.error("Erro ao atualizar status:", error);
+      Alert.alert(
+        "Erro",
+        error.message || "Erro ao atualizar o status do projeto"
+      );
+    } finally {
+      setUpdatingStatus(false);
+    }
+  };
+
+  // Verifica se existe algum projeto em votação
+  const hasProjectInVoting = projects.some(
+    (project) => project.status === "EmVotacao"
+  );
 
   const renderProjectCard = ({ item: project }: { item: Project }) => (
     <TouchableOpacity
@@ -143,6 +219,24 @@ export default function ProjectsBySessionScreen() {
           {new Date(project.criadoEm).toLocaleDateString("pt-BR")}
         </Text>
       </View>
+      {project.status === "Apresentado" && !hasProjectInVoting && (
+        <TouchableOpacity
+          style={[
+            styles.actionButton,
+            {
+              backgroundColor: colors.primary,
+            },
+          ]}
+          onPress={() =>
+            handleOpenVotingConfirmation(project.id, project.titulo)
+          }
+          disabled={updatingStatus}
+          activeOpacity={0.8}
+        >
+          <IconSymbol name="checkmark.circle" size={18} color="#ffffff" />
+          <Text style={styles.actionButtonText}>Enviar para Votação</Text>
+        </TouchableOpacity>
+      )}
     </TouchableOpacity>
   );
 
@@ -295,6 +389,16 @@ export default function ProjectsBySessionScreen() {
             tintColor={colors.primary}
           />
         }
+      />
+      <ConfirmationModal
+        visible={confirmationModal.visible}
+        title={confirmationModal.title}
+        message={confirmationModal.message}
+        confirmText="Confirmar"
+        cancelText="Cancelar"
+        onConfirm={handleConfirmStatusUpdate}
+        onCancel={handleCloseConfirmation}
+        type="default"
       />
     </View>
   );
@@ -461,6 +565,21 @@ const styles = StyleSheet.create({
   },
   goToSessionsButtonText: {
     fontSize: FontSizes.md,
+    fontWeight: FontWeights.semibold,
+    color: "#ffffff",
+  },
+  actionButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    paddingVertical: Spacing.sm,
+    paddingHorizontal: Spacing.md,
+    borderRadius: BorderRadius.md,
+    marginTop: Spacing.md,
+    gap: Spacing.xs,
+  },
+  actionButtonText: {
+    fontSize: FontSizes.sm,
     fontWeight: FontWeights.semibold,
     color: "#ffffff",
   },

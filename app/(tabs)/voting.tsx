@@ -1,5 +1,5 @@
 import { Ionicons } from "@expo/vector-icons";
-import React from "react";
+import React, { useEffect, useState } from "react";
 import {
   Alert,
   ScrollView,
@@ -9,6 +9,9 @@ import {
   View,
 } from "react-native";
 
+import { ConfirmationModal } from "@/components/common/ConfirmationModal";
+import { EmptyState } from "@/components/common/EmptyState";
+import { Spinner } from "@/components/common/Spinner";
 import { Header } from "@/components/layout/Header";
 import {
   BorderRadius,
@@ -17,12 +20,82 @@ import {
   FontWeights,
   Spacing,
 } from "@/constants/theme";
+import { useSession } from "@/contexts/SessionContext";
 import { useColorScheme } from "@/hooks/use-color-scheme";
+import { Project, projectsService } from "@/services/projectsService";
 
 export default function VotingScreen() {
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme as keyof typeof Colors];
   const isPresident = false; // Para mostrar o header de vereador
+  const { activeSession, loading: sessionLoading } = useSession();
+
+  const [votingProject, setVotingProject] = useState<Project | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [timer, setTimer] = useState(60); // Timer de 60 segundos
+  const [timerActive, setTimerActive] = useState(false);
+  const [confirmationModal, setConfirmationModal] = useState<{
+    visible: boolean;
+    title: string;
+    message: string;
+    voteType: "approve" | "reject" | "abstain" | null;
+  }>({
+    visible: false,
+    title: "",
+    message: "",
+    voteType: null,
+  });
+
+  // Busca projeto em votação
+  useEffect(() => {
+    if (activeSession?.id && activeSession.status === "EmAndamento") {
+      loadVotingProject();
+    }
+  }, [activeSession?.id, activeSession?.status]);
+
+  // Timer countdown
+  useEffect(() => {
+    if (!timerActive || timer <= 0) return;
+
+    const interval = setInterval(() => {
+      setTimer((prev) => {
+        if (prev <= 1) {
+          setTimerActive(false);
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+
+    return () => clearInterval(interval);
+  }, [timerActive, timer]);
+
+  const loadVotingProject = async () => {
+    if (!activeSession?.id) return;
+
+    try {
+      setLoading(true);
+      const projects = await projectsService.getBySession(activeSession.id);
+
+      // Filtra projeto com status EmVotacao
+      const projectInVoting = projects.find(
+        (project) => project.status === "EmVotacao"
+      );
+
+      if (projectInVoting) {
+        setVotingProject(projectInVoting);
+        setTimer(60); // Inicia timer de 1 minuto
+        setTimerActive(true);
+      } else {
+        setVotingProject(null);
+      }
+    } catch (error) {
+      console.error("Erro ao carregar projeto em votação:", error);
+      setVotingProject(null);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const handleNotificationPress = () => {
     Alert.alert("Notificações", "Você tem 3 novas notificações");
@@ -32,18 +105,146 @@ export default function VotingScreen() {
     Alert.alert("Perfil", "Abrir perfil do usuário");
   };
 
-  const handleVote = (voteType: "approve" | "reject" | "abstain") => {
-    Alert.alert(
-      "Voto Registrado",
-      `Seu voto foi registrado: ${
-        voteType === "approve"
-          ? "Aprovar"
-          : voteType === "reject"
-          ? "Rejeitar"
-          : "Abster-se"
-      }`
-    );
+  const handleVoteClick = (voteType: "approve" | "reject" | "abstain") => {
+    const voteLabels = {
+      approve: "Aprovar",
+      reject: "Rejeitar",
+      abstain: "Abster-se",
+    };
+
+    setConfirmationModal({
+      visible: true,
+      title: "Confirmar Voto",
+      message: `Deseja confirmar seu voto: ${voteLabels[voteType]}?`,
+      voteType,
+    });
   };
+
+  const handleCloseConfirmation = () => {
+    setConfirmationModal({
+      visible: false,
+      title: "",
+      message: "",
+      voteType: null,
+    });
+  };
+
+  const handleConfirmVote = async () => {
+    const { voteType } = confirmationModal;
+    if (!voteType || !votingProject || !activeSession?.id) return;
+
+    try {
+      // Mapeia o tipo de voto para o formato da API
+      const tipoVotoMap: Record<
+        "approve" | "reject" | "abstain",
+        "Sim" | "Não" | "Abstenção"
+      > = {
+        approve: "Sim",
+        reject: "Não",
+        abstain: "Abstenção",
+      };
+
+      const tipoVoto = tipoVotoMap[voteType];
+
+      // Chama a API para registrar o voto
+      await projectsService.vote(votingProject.id, activeSession.id, tipoVoto);
+
+      handleCloseConfirmation();
+      Alert.alert("Sucesso", "Seu voto foi registrado com sucesso!");
+
+      // Recarrega o projeto (pode ter mudado após o voto)
+      await loadVotingProject();
+    } catch (error: any) {
+      console.error("Erro ao registrar voto:", error);
+      Alert.alert(
+        "Erro",
+        error.message || "Erro ao registrar o voto. Tente novamente."
+      );
+    }
+  };
+
+  const formatTimer = (seconds: number) => {
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${mins}:${secs.toString().padStart(2, "0")}`;
+  };
+
+  // Mostra spinner enquanto carrega sessão
+  if (sessionLoading) {
+    return (
+      <View style={[styles.container, { backgroundColor: colors.background }]}>
+        <Spinner />
+      </View>
+    );
+  }
+
+  // Se não há sessão ativa
+  if (!activeSession) {
+    return (
+      <View style={[styles.container, { backgroundColor: colors.secondary }]}>
+        <View style={styles.topSection}>
+          <Header
+            userRole={isPresident ? "Presidente" : "Vereador"}
+            onNotificationPress={handleNotificationPress}
+            onProfilePress={handleProfilePress}
+          />
+        </View>
+        <View
+          style={[styles.bottomSection, { backgroundColor: colors.background }]}
+        >
+          <EmptyState
+            icon="calendar"
+            title="Nenhuma Sessão em Andamento"
+            message="Não há uma sessão em andamento no momento. Aguarde até que uma sessão seja aberta."
+          />
+        </View>
+      </View>
+    );
+  }
+
+  // Se está carregando projeto
+  if (loading) {
+    return (
+      <View style={[styles.container, { backgroundColor: colors.secondary }]}>
+        <View style={styles.topSection}>
+          <Header
+            userRole={isPresident ? "Presidente" : "Vereador"}
+            onNotificationPress={handleNotificationPress}
+            onProfilePress={handleProfilePress}
+          />
+        </View>
+        <View
+          style={[styles.bottomSection, { backgroundColor: colors.background }]}
+        >
+          <Spinner />
+        </View>
+      </View>
+    );
+  }
+
+  // Se não há projeto em votação
+  if (!votingProject) {
+    return (
+      <View style={[styles.container, { backgroundColor: colors.secondary }]}>
+        <View style={styles.topSection}>
+          <Header
+            userRole={isPresident ? "Presidente" : "Vereador"}
+            onNotificationPress={handleNotificationPress}
+            onProfilePress={handleProfilePress}
+          />
+        </View>
+        <View
+          style={[styles.bottomSection, { backgroundColor: colors.background }]}
+        >
+          <EmptyState
+            icon="clock"
+            title="Aguardando Projetos para Votação"
+            message="Não há projetos em votação no momento. Aguarde até que um projeto seja enviado para votação."
+          />
+        </View>
+      </View>
+    );
+  }
 
   return (
     <View style={[styles.container, { backgroundColor: colors.secondary }]}>
@@ -64,6 +265,14 @@ export default function VotingScreen() {
           <View style={styles.greeting}>
             <Text style={styles.greetingText}>Votação</Text>
           </View>
+          <View style={styles.timerContainer}>
+            <View
+              style={[styles.timerBadge, { backgroundColor: colors.primary }]}
+            >
+              <Ionicons name="time-outline" size={16} color="#ffffff" />
+              <Text style={styles.timerText}>{formatTimer(timer)}</Text>
+            </View>
+          </View>
         </View>
       </View>
 
@@ -78,41 +287,63 @@ export default function VotingScreen() {
 
         <View style={styles.proposalCard}>
           <View style={styles.contentSection}>
-            <Text style={styles.proposalTitle}>Projeto Escola Conectada</Text>
+            <Text style={styles.proposalTitle}>{votingProject.titulo}</Text>
 
             <Text style={styles.proposalDescription}>
-              Implantação de internet de alta velocidade em todas as escolas
-              municipais
+              {votingProject.descricao}
             </Text>
+
+            <View style={styles.projectInfo}>
+              <Text style={styles.authorText}>
+                Autor: {votingProject.autorNome} {votingProject.autorSobrenome}
+              </Text>
+              <Text style={styles.dateText}>
+                {new Date(votingProject.criadoEm).toLocaleDateString("pt-BR")}
+              </Text>
+            </View>
           </View>
 
           <View style={styles.votingButtons}>
             <TouchableOpacity
               style={[styles.voteButton, styles.approveButton]}
-              onPress={() => handleVote("approve")}
+              onPress={() => handleVoteClick("approve")}
+              activeOpacity={0.8}
             >
-              <Ionicons name="checkmark" size={24} color="#ffffff" />
+              <Ionicons name="checkmark-circle" size={32} color="#ffffff" />
               <Text style={styles.buttonText}>Aprovar</Text>
             </TouchableOpacity>
 
             <TouchableOpacity
               style={[styles.voteButton, styles.rejectButton]}
-              onPress={() => handleVote("reject")}
+              onPress={() => handleVoteClick("reject")}
+              activeOpacity={0.8}
             >
-              <Ionicons name="close" size={24} color="#ffffff" />
+              <Ionicons name="close-circle" size={32} color="#ffffff" />
               <Text style={styles.buttonText}>Rejeitar</Text>
             </TouchableOpacity>
 
             <TouchableOpacity
               style={[styles.voteButton, styles.abstainButton]}
-              onPress={() => handleVote("abstain")}
+              onPress={() => handleVoteClick("abstain")}
+              activeOpacity={0.8}
             >
-              <Ionicons name="remove" size={24} color="#ffffff" />
+              <Ionicons name="remove-circle" size={32} color="#ffffff" />
               <Text style={styles.buttonText}>Abster-se</Text>
             </TouchableOpacity>
           </View>
         </View>
       </ScrollView>
+
+      <ConfirmationModal
+        visible={confirmationModal.visible}
+        title={confirmationModal.title}
+        message={confirmationModal.message}
+        confirmText="Confirmar"
+        cancelText="Cancelar"
+        onConfirm={handleConfirmVote}
+        onCancel={handleCloseConfirmation}
+        type="default"
+      />
     </View>
   );
 }
@@ -122,7 +353,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   topSection: {
-    height: "50%",
+    height: "30%",
     justifyContent: "space-between",
     position: "relative",
   },
@@ -155,12 +386,15 @@ const styles = StyleSheet.create({
   },
   topContent: {
     flex: 1,
-    justifyContent: "flex-end",
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "flex-end",
     paddingBottom: Spacing.md,
+    paddingHorizontal: Spacing.md,
     gap: Spacing.md,
   },
   greeting: {
-    paddingHorizontal: Spacing.md,
+    paddingHorizontal: 0,
   },
   greetingText: {
     fontSize: 24,
@@ -168,7 +402,7 @@ const styles = StyleSheet.create({
     color: "#ffffff",
   },
   bottomSection: {
-    height: "50%",
+    flex: 1,
     borderTopLeftRadius: BorderRadius.xl,
     borderTopRightRadius: BorderRadius.xl,
   },
@@ -176,11 +410,27 @@ const styles = StyleSheet.create({
     padding: Spacing.md,
     flexGrow: 1,
   },
+  timerContainer: {
+    alignSelf: "flex-end",
+  },
+  timerBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: Spacing.md,
+    paddingVertical: Spacing.sm,
+    borderRadius: BorderRadius.md,
+    gap: Spacing.xs,
+  },
+  timerText: {
+    fontSize: FontSizes.md,
+    fontWeight: FontWeights.bold,
+    color: "#ffffff",
+  },
   proposalCard: {
     backgroundColor: "#ffffff",
     borderRadius: BorderRadius.lg,
-    padding: Spacing.lg,
-    flex: 1,
+    padding: Spacing.xl,
+    minHeight: 400,
     shadowColor: "#000",
     shadowOffset: {
       width: 0,
@@ -204,32 +454,51 @@ const styles = StyleSheet.create({
     opacity: 0.8,
   },
   proposalTitle: {
-    fontSize: FontSizes.xl,
+    fontSize: FontSizes.xxl,
     fontWeight: FontWeights.bold,
     color: "#198754",
     marginBottom: Spacing.lg,
     textAlign: "center",
+    lineHeight: 32,
   },
   proposalDescription: {
+    fontSize: FontSizes.lg,
+    color: "#6B7280",
+    textAlign: "center",
+    lineHeight: 26,
+    marginBottom: Spacing.lg,
+  },
+  projectInfo: {
+    marginTop: Spacing.md,
+    paddingTop: Spacing.md,
+    borderTopWidth: 1,
+    borderColor: "rgba(0, 0, 0, 0.1)",
+  },
+  authorText: {
     fontSize: FontSizes.md,
     color: "#6B7280",
     textAlign: "center",
-    lineHeight: 22,
+    marginBottom: Spacing.xs,
+  },
+  dateText: {
+    fontSize: FontSizes.sm,
+    color: "#9CA3AF",
+    textAlign: "center",
   },
   votingButtons: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    gap: Spacing.sm,
+    flexDirection: "column",
+    gap: Spacing.md,
+    marginTop: Spacing.lg,
   },
   voteButton: {
-    flex: 1,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
     paddingVertical: Spacing.md,
-    paddingHorizontal: Spacing.sm,
-    borderRadius: BorderRadius.md,
-    gap: Spacing.xs,
+    paddingHorizontal: Spacing.md,
+    borderRadius: BorderRadius.lg,
+    gap: Spacing.md,
+    minHeight: 60,
   },
   approveButton: {
     backgroundColor: "#198754",
@@ -241,8 +510,8 @@ const styles = StyleSheet.create({
     backgroundColor: "#F59E0B",
   },
   buttonText: {
-    fontSize: FontSizes.sm,
-    fontWeight: FontWeights.semibold,
+    fontSize: FontSizes.xl,
+    fontWeight: FontWeights.bold,
     color: "#ffffff",
   },
 });
