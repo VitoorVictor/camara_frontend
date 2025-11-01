@@ -1,5 +1,5 @@
 import { router } from "expo-router";
-import React from "react";
+import React, { useEffect } from "react";
 import { Alert, ScrollView, StyleSheet, Text, View } from "react-native";
 
 import { ActionCard } from "@/components/common/ActionCard";
@@ -12,9 +12,16 @@ import { useColorScheme } from "@/hooks/use-color-scheme";
 export default function HomeScreen() {
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme as keyof typeof Colors];
-  const { user } = useAuth();
-  const { activeSession, loading } = useSession();
+  const { user, isAuthenticated } = useAuth();
+  const { initializeSession, isInitialized } = useSession();
   const isPresident = true;
+
+  // Inicializa a sessão apenas quando o usuário está autenticado e a tela está montada
+  useEffect(() => {
+    if (isAuthenticated && !isInitialized) {
+      initializeSession();
+    }
+  }, [isAuthenticated, isInitialized, initializeSession]);
 
   const handleNotificationPress = () => {
     Alert.alert("Notificações", "Você tem 3 novas notificações");

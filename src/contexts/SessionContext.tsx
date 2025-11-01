@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useEffect, useState } from "react";
+import React, { createContext, useContext, useState } from "react";
 import { sessionsService } from "../services/sessionsService";
 
 interface Session {
@@ -16,14 +16,17 @@ interface SessionContextData {
   loading: boolean;
   error: string | null;
   refreshSession: () => Promise<void>;
+  initializeSession: () => Promise<void>;
+  isInitialized: boolean;
 }
 
 const SessionContext = createContext<SessionContextData | undefined>(undefined);
 
 export function SessionProvider({ children }: { children: React.ReactNode }) {
   const [activeSession, setActiveSession] = useState<Session | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [isInitialized, setIsInitialized] = useState(false);
 
   // Função para verificar se a sessão é válida (não é uma sessão vazia/inativa)
   const isValidSession = (session: Session | null): boolean => {
@@ -81,9 +84,12 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
-  useEffect(() => {
-    loadActiveSession();
-  }, []);
+  // Função de inicialização que só será chamada quando necessário
+  const initializeSession = async () => {
+    if (isInitialized) return; // Evita múltiplas inicializações
+    setIsInitialized(true);
+    await loadActiveSession();
+  };
 
   return (
     <SessionContext.Provider
@@ -92,6 +98,8 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
         loading,
         error,
         refreshSession: loadActiveSession,
+        initializeSession,
+        isInitialized,
       }}
     >
       {children}

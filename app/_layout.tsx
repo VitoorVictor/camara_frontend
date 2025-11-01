@@ -41,7 +41,7 @@ function ProtectedRoutes() {
   useEffect(() => {
     if (loading) return; // Aguarda carregar dados do AsyncStorage
 
-    const inAuthGroup = segments[0] === "(auth)";
+    // const inAuthGroup = segments[0] === "(auth)";
     const inTabsGroup = segments[0] === "(tabs)";
     const inStacksGroup = segments[0] === "(stacks)";
 
