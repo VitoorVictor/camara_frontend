@@ -53,19 +53,4 @@ export const projectsService = {
       status,
     });
   },
-
-  /**
-   * Vota em um projeto
-   */
-  async vote(
-    projetoId: string,
-    sessaoId: string,
-    tipoVoto: "Sim" | "Não" | "Abstenção"
-  ): Promise<void> {
-    await api.put(`/projeto/votar-no-projeto`, {
-      projetoId,
-      sessaoId,
-      tipoVoto,
-    });
-  },
 };

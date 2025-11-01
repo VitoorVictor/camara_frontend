@@ -23,6 +23,7 @@ import {
 import { useSession } from "@/contexts/SessionContext";
 import { useColorScheme } from "@/hooks/use-color-scheme";
 import { Project, projectsService } from "@/services/projectsService";
+import { votingService } from "@/services/votingService";
 
 export default function VotingScreen() {
   const colorScheme = useColorScheme();
@@ -147,7 +148,7 @@ export default function VotingScreen() {
       const tipoVoto = tipoVotoMap[voteType];
 
       // Chama a API para registrar o voto
-      await projectsService.vote(votingProject.id, activeSession.id, tipoVoto);
+      await votingService.vote(votingProject.id, activeSession.id, tipoVoto);
 
       handleCloseConfirmation();
       Alert.alert("Sucesso", "Seu voto foi registrado com sucesso!");

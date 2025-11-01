@@ -193,6 +193,11 @@ export default function SessionsScreen() {
     }
   };
 
+  // Verifica se existe alguma sessão em andamento
+  const hasActiveSession = sessions.some(
+    (session) => session.status === "EmAndamento"
+  );
+
   const handleOpenSession = async (id: string, sessionName: string) => {
     setConfirmationModal({
       visible: true,
@@ -300,21 +305,23 @@ export default function SessionsScreen() {
               Data:
             </Text>
             <Text style={[styles.dateValue, { color: colors.primaryText }]}>
-              {formatDate(session.data)}
+              {formatDate(session.data, true)}
             </Text>
           </View>
-          <View style={styles.cardDateContainer}>
-            <Text style={[styles.dateLabel, { color: colors.secondaryText }]}>
-              Aberta em:
-            </Text>
-            <Text style={[styles.dateValue, { color: colors.primaryText }]}>
-              {new Date(session.abertoEm).toLocaleDateString("pt-BR")}
-            </Text>
-          </View>
+          {session.abertoEm && session.abertoEm !== "0001-01-01T00:00:00" && (
+            <View style={styles.cardDateContainer}>
+              <Text style={[styles.dateLabel, { color: colors.secondaryText }]}>
+                Aberta em:
+              </Text>
+              <Text style={[styles.dateValue, { color: colors.primaryText }]}>
+                {formatDate(session.abertoEm, true)}
+              </Text>
+            </View>
+          )}
         </View>
 
         {/* Botões de ação */}
-        {session.status === "Agendada" && (
+        {session.status === "Agendada" && !hasActiveSession && (
           <TouchableOpacity
             style={[styles.actionButton, { backgroundColor: colors.primary }]}
             onPress={() => handleOpenSession(session.id, session.nome)}
