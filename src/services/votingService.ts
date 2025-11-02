@@ -45,7 +45,7 @@ export const votingService = {
   async vote(
     projetoId: string,
     sessaoId: string,
-    tipoVoto: "Sim" | "Não" | "Abstenção"
+    tipoVoto: "Sim" | "Nao" | "Abstencao"
   ): Promise<void> {
     await api.put(`/projeto/votar-no-projeto`, {
       projetoId,
@@ -65,5 +65,26 @@ export const votingService = {
       sessaoProjetoId,
       vereadorVotanteId,
     });
+  },
+
+  /**
+   * Confirma todos os votos de uma sessão-projeto
+   */
+  async confirmAllVotes(sessaoProjetoId: string): Promise<void> {
+    await api.put(`/Voto/confirmar-todos-votos`, {
+      sessaoProjetoId,
+    });
+  },
+
+  /**
+   * Verifica se o vereador já votou no projeto
+   */
+  async vereadorAlreadyVoteInProject(
+    sessaoProjetoId: string
+  ): Promise<boolean> {
+    const { data } = await api.get<boolean>(
+      `/Voto/vereador-already-vote-in-this-projeto?sessaoProjetoId=${sessaoProjetoId}`
+    );
+    return data;
   },
 };

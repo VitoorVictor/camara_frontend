@@ -26,6 +26,7 @@ export const Colors = {
     success: "#16A34A",
     warning: "#F59E0B",
     error: "#DC2626",
+    info: "#007AFF",
 
     // Tabs (mantendo compatibilidade)
     tint: "#198754",
@@ -53,7 +54,7 @@ export const Colors = {
     success: "#16A34A",
     warning: "#F59E0B",
     error: "#DC2626",
-
+    info: "#007AFF",
     // Tabs (mantendo compatibilidade)
     tint: "#198754",
     icon: "#687076",

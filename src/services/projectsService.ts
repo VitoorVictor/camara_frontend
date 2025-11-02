@@ -45,6 +45,16 @@ export const projectsService = {
   },
 
   /**
+   * Busca projeto com status EmVotacao
+   */
+  async getByStatusEmVotacao(): Promise<Project | null> {
+    const { data } = await api.get<Project>(
+      `/Projeto/read-by-status-em-votacao`
+    );
+    return data || null;
+  },
+
+  /**
    * Atualiza o status de um projeto
    */
   async updateStatus(projetoId: string, status: string): Promise<void> {

@@ -21,6 +21,7 @@ import React, { useEffect, useState } from "react";
 import {
   Alert,
   FlatList,
+  Modal,
   RefreshControl,
   StyleSheet,
   Text,
@@ -40,19 +41,14 @@ export default function ConfirmVotesScreen() {
 
   // Estados para modais de confirmação
   const [acceptAllModal, setAcceptAllModal] = useState(false);
-  const [rejectAllModal, setRejectAllModal] = useState(false);
   const [acceptVoteModal, setAcceptVoteModal] = useState<Voto | null>(null);
-  const [rejectVoteModal, setRejectVoteModal] = useState<Voto | null>(null);
 
-  // Estados para modais de status do projeto
-  const [approveProjectModal, setApproveProjectModal] = useState(false);
-  const [rejectProjectModal, setRejectProjectModal] = useState(false);
-  const [approveNextInstanceModal, setApproveNextInstanceModal] =
-    useState(false);
+  // Estado para modal de finalizar votação
+  const [finishVotingModal, setFinishVotingModal] = useState(false);
   const [updatingProjectStatus, setUpdatingProjectStatus] = useState(false);
 
   // Mock do ID da sessão projeto
-  const SESSAO_PROJETO_ID = "b26c6e9e-6e4a-4cc6-9c3e-dcdb53e2c7b9";
+  const SESSAO_PROJETO_ID = "b88e3c11-3b6c-4b3a-86b1-51494b60a0d9";
 
   useEffect(() => {
     loadVereadoresData();
@@ -102,32 +98,15 @@ export default function ConfirmVotesScreen() {
 
   const handleConfirmAcceptAll = async () => {
     setAcceptAllModal(false);
-    if (!data || !data.votos.length) return;
+    if (!data) return;
 
     try {
-      // Confirma todos os votos pendentes
-      const pendingVotes = data.votos.filter((v) => !v.votoConfirmado);
-      for (const voto of pendingVotes) {
-        await votingService.confirmVote(
-          SESSAO_PROJETO_ID,
-          voto.vereadorVotante.id
-        );
-      }
+      await votingService.confirmAllVotes(SESSAO_PROJETO_ID);
       Alert.alert("Sucesso", "Todos os votos foram aceitos!");
       loadVereadoresData();
     } catch (error: any) {
       Alert.alert("Erro", error.message || "Erro ao aceitar todos os votos");
     }
-  };
-
-  const handleRejectAllVotes = () => {
-    setRejectAllModal(true);
-  };
-
-  const handleConfirmRejectAll = async () => {
-    setRejectAllModal(false);
-    // TODO: Implementar função de rejeitar todos os votos (se houver rota específica)
-    Alert.alert("Aviso", "Função de rejeitar todos ainda não implementada");
   };
 
   const handleAcceptVote = (voto: Voto) => {
@@ -150,26 +129,14 @@ export default function ConfirmVotesScreen() {
     }
   };
 
-  const handleRejectVote = (voto: Voto) => {
-    setRejectVoteModal(voto);
+  // Handlers para finalizar votação
+  const handleFinishVoting = () => {
+    setFinishVotingModal(true);
   };
 
-  const handleConfirmRejectVote = async () => {
-    if (!rejectVoteModal) return;
-
-    // TODO: Implementar função de rejeitar voto individual (se houver rota específica)
-    Alert.alert("Aviso", "Função de rejeitar voto ainda não implementada");
-    setRejectVoteModal(null);
-  };
-
-  // Handlers para status do projeto
-  const handleApproveProject = () => {
-    setApproveProjectModal(true);
-  };
-
-  const handleConfirmApproveProject = async () => {
+  const handleConfirmFinishApprove = async () => {
     if (!project) return;
-    setApproveProjectModal(false);
+    setFinishVotingModal(false);
 
     try {
       setUpdatingProjectStatus(true);
@@ -183,13 +150,9 @@ export default function ConfirmVotesScreen() {
     }
   };
 
-  const handleRejectProject = () => {
-    setRejectProjectModal(true);
-  };
-
-  const handleConfirmRejectProject = async () => {
+  const handleConfirmFinishReject = async () => {
     if (!project) return;
-    setRejectProjectModal(false);
+    setFinishVotingModal(false);
 
     try {
       setUpdatingProjectStatus(true);
@@ -198,31 +161,6 @@ export default function ConfirmVotesScreen() {
       await Promise.all([loadProject(), loadVereadoresData()]);
     } catch (error: any) {
       Alert.alert("Erro", error.message || "Erro ao rejeitar o projeto");
-    } finally {
-      setUpdatingProjectStatus(false);
-    }
-  };
-
-  const handleApproveNextInstance = () => {
-    setApproveNextInstanceModal(true);
-  };
-
-  const handleConfirmApproveNextInstance = async () => {
-    if (!project) return;
-    setApproveNextInstanceModal(false);
-
-    try {
-      setUpdatingProjectStatus(true);
-      // TODO: Verificar se existe uma rota específica para "aprovar para próxima instância"
-      // Por enquanto, usando o mesmo updateStatus com status apropriado
-      await projectsService.updateStatus(project.id, "Aprovado");
-      Alert.alert("Sucesso", "Projeto aprovado para próxima instância!");
-      await Promise.all([loadProject(), loadVereadoresData()]);
-    } catch (error: any) {
-      Alert.alert(
-        "Erro",
-        error.message || "Erro ao aprovar para próxima instância"
-      );
     } finally {
       setUpdatingProjectStatus(false);
     }
@@ -243,9 +181,9 @@ export default function ConfirmVotesScreen() {
     switch (valor) {
       case "Sim":
         return "Aprovar";
-      case "Não":
+      case "Nao":
         return "Rejeitar";
-      case "Abstenção":
+      case "Abstencao":
         return "Abster-se";
       default:
         return valor;
@@ -256,9 +194,9 @@ export default function ConfirmVotesScreen() {
     switch (valor) {
       case "Sim":
         return colors.success;
-      case "Não":
+      case "Nao":
         return colors.error;
-      case "Abstenção":
+      case "Abstencao":
         return colors.warning;
       default:
         return colors.inactive;
@@ -313,24 +251,6 @@ export default function ConfirmVotesScreen() {
           </View>
         </View>
         <View style={styles.voteActions}>
-          <TouchableOpacity
-            style={[
-              styles.actionButton,
-              styles.rejectButton,
-              {
-                backgroundColor: voto.votoConfirmado
-                  ? colors.inactive
-                  : colors.error,
-              },
-            ]}
-            onPress={() => handleRejectVote(voto)}
-            disabled={voto.votoConfirmado}
-            activeOpacity={0.8}
-          >
-            <Text style={styles.actionButtonText}>
-              {voto.votoConfirmado ? "Rejeitado" : "Rejeitar"}
-            </Text>
-          </TouchableOpacity>
           <TouchableOpacity
             style={[
               styles.actionButton,
@@ -433,7 +353,7 @@ export default function ConfirmVotesScreen() {
                 <Text
                   style={[styles.summaryLabel, { color: colors.secondaryText }]}
                 >
-                  Sim
+                  Aprovar
                 </Text>
               </View>
               <View style={styles.summaryItem}>
@@ -443,7 +363,7 @@ export default function ConfirmVotesScreen() {
                 <Text
                   style={[styles.summaryLabel, { color: colors.secondaryText }]}
                 >
-                  Não
+                  Negar
                 </Text>
               </View>
               <View style={styles.summaryItem}>
@@ -467,111 +387,63 @@ export default function ConfirmVotesScreen() {
                 </Text>
               </View>
             </View>
-
-            {/* Botões de ação do projeto */}
-            {project &&
-              project.status === "EmVotacao" &&
-              data.votos.length > 0 &&
-              data.votos.every((voto) => voto.votoConfirmado) && (
-                <View style={styles.projectActionButtons}>
-                  <TouchableOpacity
-                    style={[
-                      styles.projectActionButton,
-                      styles.approveButton,
-                      { backgroundColor: colors.success },
-                    ]}
-                    onPress={handleApproveProject}
-                    disabled={updatingProjectStatus}
-                    activeOpacity={0.8}
-                  >
-                    <IconSymbol
-                      name="checkmark.circle"
-                      size={18}
-                      color="#ffffff"
-                    />
-                    <Text style={styles.projectActionButtonText}>
-                      Aprovar Projeto
-                    </Text>
-                  </TouchableOpacity>
-
-                  <TouchableOpacity
-                    style={[
-                      styles.projectActionButton,
-                      styles.nextInstanceButton,
-                      { backgroundColor: colors.primary },
-                    ]}
-                    onPress={handleApproveNextInstance}
-                    disabled={updatingProjectStatus}
-                    activeOpacity={0.8}
-                  >
-                    <IconSymbol
-                      name="chevron.right"
-                      size={18}
-                      color="#ffffff"
-                    />
-                    <Text style={styles.projectActionButtonText}>
-                      Aprovar Próxima Instância
-                    </Text>
-                  </TouchableOpacity>
-
-                  <TouchableOpacity
-                    style={[
-                      styles.projectActionButton,
-                      styles.rejectButtonProject,
-                      { backgroundColor: colors.error },
-                    ]}
-                    onPress={handleRejectProject}
-                    disabled={updatingProjectStatus}
-                    activeOpacity={0.8}
-                  >
-                    <IconSymbol
-                      name="xmark.circle.fill"
-                      size={18}
-                      color="#ffffff"
-                    />
-                    <Text style={styles.projectActionButtonText}>
-                      Rejeitar Projeto
-                    </Text>
-                  </TouchableOpacity>
-                </View>
-              )}
+            <View style={styles.totalContainer}>
+              <Text style={[styles.totalLabel, { color: colors.primaryText }]}>
+                Total de Votos:
+              </Text>
+              <Text style={[styles.totalValue, { color: colors.info }]}>
+                {data.votosTotais}
+              </Text>
+            </View>
           </View>
         </View>
 
-        <View style={styles.topButtonContainer}>
-          <View style={styles.topButtonsRow}>
-            <TouchableOpacity
-              style={[
-                styles.topActionButton,
-                styles.rejectAllButton,
-                { backgroundColor: colors.error },
-              ]}
-              onPress={handleRejectAllVotes}
-              activeOpacity={0.8}
-            >
-              <IconSymbol name="xmark.circle.fill" size={20} color="#ffffff" />
-              <Text style={styles.topActionButtonText}>Rejeitar Todos</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[
-                styles.topActionButton,
-                styles.acceptAllButton,
-                { backgroundColor: colors.success },
-              ]}
-              onPress={handleAcceptAllVotes}
-              activeOpacity={0.8}
-            >
-              <IconSymbol name="checkmark.circle" size={20} color="#ffffff" />
-              <Text style={styles.topActionButtonText}>Aceitar Todos</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
+        {/* Botão Aceitar Todos - apenas se houver votos pendentes */}
+        {data &&
+          data.votos.length > 0 &&
+          data.votos.some((voto) => !voto.votoConfirmado) && (
+            <View style={styles.topButtonContainer}>
+              <TouchableOpacity
+                style={[
+                  styles.topActionButton,
+                  styles.acceptAllButton,
+                  { backgroundColor: colors.success },
+                ]}
+                onPress={handleAcceptAllVotes}
+                activeOpacity={0.8}
+              >
+                <IconSymbol name="checkmark.circle" size={20} color="#ffffff" />
+                <Text style={styles.topActionButtonText}>Aceitar Todos</Text>
+              </TouchableOpacity>
+            </View>
+          )}
       </>
     );
   };
 
   const renderFooter = () => {
     if (!data || data.votos.length === 0) return null;
+
+    // Botão Finalizar Votação no footer se não houver mais votos
+    if (data.votos.every((voto) => voto.votoConfirmado)) {
+      return (
+        <View style={styles.footer}>
+          <TouchableOpacity
+            style={[
+              styles.finishVotingButton,
+              { backgroundColor: colors.primary },
+            ]}
+            onPress={handleFinishVoting}
+            disabled={updatingProjectStatus}
+            activeOpacity={0.8}
+          >
+            <IconSymbol name="checkmark.circle" size={20} color="#ffffff" />
+            <Text style={styles.finishVotingButtonText}>Finalizar Votação</Text>
+          </TouchableOpacity>
+        </View>
+      );
+    }
+
     return <View style={styles.footer} />;
   };
 
@@ -655,18 +527,6 @@ export default function ConfirmVotesScreen() {
         type="default"
       />
 
-      {/* Modal de confirmar rejeitar todos */}
-      <ConfirmationModal
-        visible={rejectAllModal}
-        title="Rejeitar Todos os Votos"
-        message="Deseja rejeitar todos os votos pendentes?"
-        confirmText="Rejeitar"
-        cancelText="Cancelar"
-        onConfirm={handleConfirmRejectAll}
-        onCancel={() => setRejectAllModal(false)}
-        type="danger"
-      />
-
       {/* Modal de confirmar aceitar voto individual */}
       <ConfirmationModal
         visible={acceptVoteModal !== null}
@@ -679,53 +539,18 @@ export default function ConfirmVotesScreen() {
         type="default"
       />
 
-      {/* Modal de confirmar rejeitar voto individual */}
-      <ConfirmationModal
-        visible={rejectVoteModal !== null}
-        title="Rejeitar Voto"
-        message={`Deseja rejeitar o voto de ${rejectVoteModal?.vereadorVotante.nome}?`}
-        confirmText="Rejeitar"
-        cancelText="Cancelar"
-        onConfirm={handleConfirmRejectVote}
-        onCancel={() => setRejectVoteModal(null)}
-        type="danger"
-      />
-
-      {/* Modal de confirmar aprovar projeto */}
-      <ConfirmationModal
-        visible={approveProjectModal}
-        title="Aprovar Projeto"
-        message={`Deseja marcar o projeto "${project?.titulo}" como aprovado?`}
-        confirmText="Aprovar"
-        cancelText="Cancelar"
-        onConfirm={handleConfirmApproveProject}
-        onCancel={() => setApproveProjectModal(false)}
-        type="default"
-      />
-
-      {/* Modal de confirmar rejeitar projeto */}
-      <ConfirmationModal
-        visible={rejectProjectModal}
-        title="Rejeitar Projeto"
-        message={`Deseja marcar o projeto "${project?.titulo}" como rejeitado?`}
-        confirmText="Rejeitar"
-        cancelText="Cancelar"
-        onConfirm={handleConfirmRejectProject}
-        onCancel={() => setRejectProjectModal(false)}
-        type="danger"
-      />
-
-      {/* Modal de confirmar aprovar para próxima instância */}
-      <ConfirmationModal
-        visible={approveNextInstanceModal}
-        title="Aprovar para Próxima Instância"
-        message={`Deseja aprovar o projeto "${project?.titulo}" para a próxima instância?`}
-        confirmText="Aprovar"
-        cancelText="Cancelar"
-        onConfirm={handleConfirmApproveNextInstance}
-        onCancel={() => setApproveNextInstanceModal(false)}
-        type="default"
-      />
+      {/* Modal de finalizar votação */}
+      {finishVotingModal && data && (
+        <FinishVotingModal
+          visible={finishVotingModal}
+          data={data}
+          project={project}
+          onApprove={handleConfirmFinishApprove}
+          onReject={handleConfirmFinishReject}
+          onCancel={() => setFinishVotingModal(false)}
+          colors={colors}
+        />
+      )}
     </View>
   );
 }
@@ -737,12 +562,8 @@ const styles = StyleSheet.create({
   topButtonContainer: {
     paddingBottom: Spacing.md,
   },
-  topButtonsRow: {
-    flexDirection: "row",
-    gap: Spacing.md,
-  },
   topActionButton: {
-    flex: 1,
+    width: "100%",
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
@@ -751,9 +572,6 @@ const styles = StyleSheet.create({
     gap: Spacing.sm,
   },
   acceptAllButton: {
-    // Estilo será aplicado dinamicamente
-  },
-  rejectAllButton: {
     // Estilo será aplicado dinamicamente
   },
   topActionButtonText: {
@@ -797,35 +615,23 @@ const styles = StyleSheet.create({
   summaryLabel: {
     fontSize: FontSizes.sm,
   },
-  projectActionButtons: {
-    marginTop: Spacing.lg,
-    paddingTop: Spacing.lg,
+  totalContainer: {
+    flexDirection: "row",
+    justifyContent: "center",
+    alignItems: "center",
+    marginTop: Spacing.md,
+    paddingTop: Spacing.md,
     borderTopWidth: 1,
     borderTopColor: "rgba(0, 0, 0, 0.1)",
     gap: Spacing.sm,
   },
-  projectActionButton: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    paddingVertical: Spacing.md,
-    paddingHorizontal: Spacing.md,
-    borderRadius: BorderRadius.md,
-    gap: Spacing.sm,
+  totalLabel: {
+    fontSize: FontSizes.lg,
+    fontWeight: FontWeights.bold,
   },
-  approveButton: {
-    // Estilo será aplicado dinamicamente
-  },
-  rejectButtonProject: {
-    // Estilo será aplicado dinamicamente
-  },
-  nextInstanceButton: {
-    // Estilo será aplicado dinamicamente
-  },
-  projectActionButtonText: {
-    fontSize: FontSizes.sm,
-    fontWeight: FontWeights.semibold,
-    color: "#ffffff",
+  totalValue: {
+    fontSize: FontSizes.xxl,
+    fontWeight: FontWeights.bold,
   },
   voteCard: {
     padding: Spacing.md,
@@ -972,5 +778,359 @@ const styles = StyleSheet.create({
   },
   projectDateText: {
     fontSize: FontSizes.xs,
+  },
+  finishVotingButton: {
+    width: "100%",
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    padding: Spacing.md,
+    borderRadius: BorderRadius.md,
+    gap: Spacing.sm,
+  },
+  finishVotingButtonText: {
+    fontSize: FontSizes.md,
+    fontWeight: FontWeights.semibold,
+    color: "#ffffff",
+  },
+});
+
+// Modal customizado para finalizar votação
+interface FinishVotingModalProps {
+  visible: boolean;
+  data: VotosPorSessaoProjeto;
+  project: Project | null;
+  onApprove: () => void;
+  onReject: () => void;
+  onCancel: () => void;
+  colors: any;
+}
+
+function FinishVotingModal({
+  visible,
+  data,
+  project,
+  onApprove,
+  onReject,
+  onCancel,
+  colors,
+}: FinishVotingModalProps) {
+  // Calcula abstenção incluindo faltantes
+  const abstencaoTotal = data.votosAbstencao + data.votosFaltou;
+
+  return (
+    <Modal
+      transparent
+      visible={visible}
+      animationType="fade"
+      onRequestClose={onCancel}
+    >
+      <View style={finishModalStyles.overlay}>
+        <View
+          style={[
+            finishModalStyles.modalContainer,
+            { backgroundColor: colors.background },
+          ]}
+        >
+          <View style={finishModalStyles.content}>
+            <Text
+              style={[finishModalStyles.title, { color: colors.primaryText }]}
+            >
+              Finalizar Votação
+            </Text>
+
+            <View
+              style={[
+                finishModalStyles.warningBox,
+                {
+                  backgroundColor: colors.warning
+                    ? `${colors.warning}20`
+                    : "rgba(245, 158, 11, 0.2)",
+                  borderColor: colors.warning || "#F59E0B",
+                },
+              ]}
+            >
+              <Text
+                style={[
+                  finishModalStyles.warningText,
+                  { color: colors.primaryText },
+                ]}
+              >
+                ⚠️ A sessão de votação deste projeto será finalizada e não será
+                possível voltar atrás.
+              </Text>
+            </View>
+
+            <Text
+              style={[
+                finishModalStyles.summaryTitle,
+                { color: colors.primaryText },
+              ]}
+            >
+              Resumo Final dos Votos
+            </Text>
+
+            <View style={finishModalStyles.summaryGrid}>
+              <View style={finishModalStyles.summaryItem}>
+                <Text
+                  style={[
+                    finishModalStyles.summaryValue,
+                    { color: colors.success },
+                  ]}
+                >
+                  {data.votosSim}
+                </Text>
+                <Text
+                  style={[
+                    finishModalStyles.summaryLabel,
+                    { color: colors.secondaryText },
+                  ]}
+                >
+                  Sim
+                </Text>
+              </View>
+              <View style={finishModalStyles.summaryItem}>
+                <Text
+                  style={[
+                    finishModalStyles.summaryValue,
+                    { color: colors.error },
+                  ]}
+                >
+                  {data.votosNao}
+                </Text>
+                <Text
+                  style={[
+                    finishModalStyles.summaryLabel,
+                    { color: colors.secondaryText },
+                  ]}
+                >
+                  Não
+                </Text>
+              </View>
+              <View style={finishModalStyles.summaryItem}>
+                <Text
+                  style={[
+                    finishModalStyles.summaryValue,
+                    { color: colors.warning },
+                  ]}
+                >
+                  {abstencaoTotal}
+                </Text>
+                <Text
+                  style={[
+                    finishModalStyles.summaryLabel,
+                    { color: colors.secondaryText },
+                  ]}
+                >
+                  Abstenção
+                </Text>
+              </View>
+            </View>
+            <View style={finishModalStyles.totalContainer}>
+              <Text
+                style={[
+                  finishModalStyles.totalLabel,
+                  { color: colors.primaryText },
+                ]}
+              >
+                Total:
+              </Text>
+              <Text
+                style={[
+                  finishModalStyles.totalValue,
+                  { color: colors.primary },
+                ]}
+              >
+                {data.votosTotais}
+              </Text>
+            </View>
+
+            <Text
+              style={[
+                finishModalStyles.observation,
+                { color: colors.secondaryText },
+              ]}
+            >
+              *Os faltantes ({data.votosFaltou}) foram contabilizados na
+              abstenção.
+            </Text>
+
+            <View style={finishModalStyles.buttonsContainer}>
+              <TouchableOpacity
+                style={[
+                  finishModalStyles.button,
+                  finishModalStyles.rejectButton,
+                  { backgroundColor: colors.error },
+                ]}
+                onPress={onReject}
+                activeOpacity={0.8}
+              >
+                <Text style={finishModalStyles.buttonText}>
+                  Rejeitar Projeto
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[
+                  finishModalStyles.button,
+                  finishModalStyles.approveButton,
+                  { backgroundColor: colors.success },
+                ]}
+                onPress={onApprove}
+                activeOpacity={0.8}
+              >
+                <Text style={finishModalStyles.buttonText}>
+                  Aprovar Projeto
+                </Text>
+              </TouchableOpacity>
+            </View>
+
+            <TouchableOpacity
+              style={[
+                finishModalStyles.cancelButton,
+                { borderColor: colors.border },
+              ]}
+              onPress={onCancel}
+              activeOpacity={0.7}
+            >
+              <Text
+                style={[
+                  finishModalStyles.cancelButtonText,
+                  { color: colors.primaryText },
+                ]}
+              >
+                Cancelar
+              </Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </View>
+    </Modal>
+  );
+}
+
+const finishModalStyles = StyleSheet.create({
+  overlay: {
+    flex: 1,
+    backgroundColor: "rgba(0, 0, 0, 0.5)",
+    justifyContent: "center",
+    alignItems: "center",
+    padding: Spacing.lg,
+  },
+  modalContainer: {
+    width: "100%",
+    maxWidth: 400,
+    borderRadius: BorderRadius.xl,
+    padding: Spacing.lg,
+    shadowColor: "#000",
+    shadowOffset: {
+      width: 0,
+      height: 4,
+    },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 8,
+  },
+  content: {
+    marginBottom: Spacing.md,
+  },
+  title: {
+    fontSize: FontSizes.xl,
+    fontWeight: FontWeights.bold,
+    marginBottom: Spacing.md,
+    textAlign: "center",
+  },
+  warningBox: {
+    padding: Spacing.md,
+    borderRadius: BorderRadius.md,
+    borderWidth: 1,
+    marginBottom: Spacing.lg,
+  },
+  warningText: {
+    fontSize: FontSizes.sm,
+    lineHeight: 20,
+    textAlign: "center",
+  },
+  summaryTitle: {
+    fontSize: FontSizes.lg,
+    fontWeight: FontWeights.bold,
+    marginBottom: Spacing.md,
+    textAlign: "center",
+  },
+  summaryGrid: {
+    flexDirection: "row",
+    justifyContent: "space-around",
+    alignItems: "center",
+    marginBottom: Spacing.md,
+  },
+  summaryItem: {
+    flex: 1,
+    alignItems: "center",
+  },
+  summaryValue: {
+    fontSize: FontSizes.xxl,
+    fontWeight: FontWeights.bold,
+    marginBottom: Spacing.xs,
+  },
+  summaryLabel: {
+    fontSize: FontSizes.sm,
+  },
+  totalContainer: {
+    flexDirection: "row",
+    justifyContent: "center",
+    alignItems: "center",
+    marginTop: Spacing.md,
+    paddingTop: Spacing.md,
+    borderTopWidth: 1,
+    borderTopColor: "rgba(0, 0, 0, 0.1)",
+    gap: Spacing.sm,
+  },
+  totalLabel: {
+    fontSize: FontSizes.lg,
+    fontWeight: FontWeights.bold,
+  },
+  totalValue: {
+    fontSize: FontSizes.xxl,
+    fontWeight: FontWeights.bold,
+  },
+  observation: {
+    fontSize: FontSizes.xs,
+    fontStyle: "italic",
+    textAlign: "center",
+    marginBottom: Spacing.lg,
+  },
+  buttonsContainer: {
+    flexDirection: "row",
+    gap: Spacing.md,
+    marginBottom: Spacing.md,
+  },
+  button: {
+    flex: 1,
+    paddingVertical: Spacing.md,
+    borderRadius: BorderRadius.md,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  approveButton: {
+    // Estilo será aplicado dinamicamente
+  },
+  rejectButton: {
+    // Estilo será aplicado dinamicamente
+  },
+  buttonText: {
+    fontSize: FontSizes.md,
+    fontWeight: FontWeights.semibold,
+    color: "#ffffff",
+  },
+  cancelButton: {
+    paddingVertical: Spacing.md,
+    borderRadius: BorderRadius.md,
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 1,
+    backgroundColor: "#ffffff",
+  },
+  cancelButtonText: {
+    fontSize: FontSizes.md,
+    fontWeight: FontWeights.semibold,
   },
 });

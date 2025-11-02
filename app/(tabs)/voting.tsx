@@ -35,6 +35,8 @@ export default function VotingScreen() {
   const [loading, setLoading] = useState(false);
   const [timer, setTimer] = useState(60); // Timer de 60 segundos
   const [timerActive, setTimerActive] = useState(false);
+  const [alreadyVoted, setAlreadyVoted] = useState(false);
+  const [checkingVote, setCheckingVote] = useState(false);
   const [confirmationModal, setConfirmationModal] = useState<{
     visible: boolean;
     title: string;
@@ -47,12 +49,23 @@ export default function VotingScreen() {
     voteType: null,
   });
 
+  // Mock do ID da sessão projeto (por enquanto fixo)
+  const SESSAO_PROJETO_ID = "b88e3c11-3b6c-4b3a-86b1-51494b60a0d9";
+
   // Busca projeto em votação
   useEffect(() => {
     if (activeSession?.id && activeSession.status === "EmAndamento") {
       loadVotingProject();
     }
   }, [activeSession?.id, activeSession?.status]);
+
+  // Verifica se já votou quando o projeto é carregado
+  useEffect(() => {
+    if (votingProject?.id) {
+      checkIfAlreadyVoted();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [votingProject?.id]);
 
   // Timer countdown
   useEffect(() => {
@@ -76,25 +89,44 @@ export default function VotingScreen() {
 
     try {
       setLoading(true);
-      const projects = await projectsService.getBySession(activeSession.id);
-
-      // Filtra projeto com status EmVotacao
-      const projectInVoting = projects.find(
-        (project) => project.status === "EmVotacao"
-      );
+      const projectInVoting = await projectsService.getByStatusEmVotacao();
 
       if (projectInVoting) {
         setVotingProject(projectInVoting);
         setTimer(60); // Inicia timer de 1 minuto
         setTimerActive(true);
+        setAlreadyVoted(false); // Reset do estado ao carregar novo projeto
       } else {
         setVotingProject(null);
+        setAlreadyVoted(false);
       }
     } catch (error) {
       console.error("Erro ao carregar projeto em votação:", error);
       setVotingProject(null);
+      setAlreadyVoted(false);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const checkIfAlreadyVoted = async () => {
+    if (!votingProject) return;
+
+    try {
+      setCheckingVote(true);
+      const hasVoted = await votingService.vereadorAlreadyVoteInProject(
+        SESSAO_PROJETO_ID
+      );
+      setAlreadyVoted(hasVoted);
+      if (hasVoted) {
+        setTimerActive(false); // Para o timer se já votou
+      }
+    } catch (error) {
+      console.error("Erro ao verificar se já votou:", error);
+      // Em caso de erro, permite votar (assumindo que não votou)
+      setAlreadyVoted(false);
+    } finally {
+      setCheckingVote(false);
     }
   };
 
@@ -138,11 +170,11 @@ export default function VotingScreen() {
       // Mapeia o tipo de voto para o formato da API
       const tipoVotoMap: Record<
         "approve" | "reject" | "abstain",
-        "Sim" | "Não" | "Abstenção"
+        "Sim" | "Nao" | "Abstencao"
       > = {
         approve: "Sim",
-        reject: "Não",
-        abstain: "Abstenção",
+        reject: "Nao",
+        abstain: "Abstencao",
       };
 
       const tipoVoto = tipoVotoMap[voteType];
@@ -153,8 +185,8 @@ export default function VotingScreen() {
       handleCloseConfirmation();
       Alert.alert("Sucesso", "Seu voto foi registrado com sucesso!");
 
-      // Recarrega o projeto (pode ter mudado após o voto)
-      await loadVotingProject();
+      // Verifica se já votou e atualiza o estado
+      await checkIfAlreadyVoted();
     } catch (error: any) {
       console.error("Erro ao registrar voto:", error);
       Alert.alert(
@@ -242,6 +274,34 @@ export default function VotingScreen() {
             title="Aguardando Projetos para Votação"
             message="Não há projetos em votação no momento. Aguarde até que um projeto seja enviado para votação."
           />
+        </View>
+      </View>
+    );
+  }
+
+  // Se já votou no projeto, mostra tela de aguardar
+  if (alreadyVoted || checkingVote) {
+    return (
+      <View style={[styles.container, { backgroundColor: colors.secondary }]}>
+        <View style={styles.topSection}>
+          <Header
+            userRole={isPresident ? "Presidente" : "Vereador"}
+            onNotificationPress={handleNotificationPress}
+            onProfilePress={handleProfilePress}
+          />
+        </View>
+        <View
+          style={[styles.bottomSection, { backgroundColor: colors.background }]}
+        >
+          {checkingVote ? (
+            <Spinner />
+          ) : (
+            <EmptyState
+              icon="checkmark.circle"
+              title="Voto Registrado"
+              message="Você já registrou seu voto para este projeto. Aguarde a finalização da votação."
+            />
+          )}
         </View>
       </View>
     );
