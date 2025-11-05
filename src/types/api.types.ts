@@ -34,30 +34,16 @@ export interface LoginResponse {
   accessToken: string;
   expiration: string;
   currentUser: CurrentUser;
+  nome: string;
+  presidente: boolean;
 }
 
 export interface CurrentUser {
-  camara: any;
   camaraId: string;
-  nome: string;
-  sobrenome: string;
-  createdAt: string;
-  updatedAt: string | null;
   id: string;
-  userName: string;
-  normalizedUserName: string;
-  email: string;
-  normalizedEmail: string;
-  emailConfirmed: boolean;
-  passwordHash: string;
-  securityStamp: string;
-  concurrencyStamp: string;
-  phoneNumber: string;
-  phoneNumberConfirmed: boolean;
-  twoFactorEnabled: boolean;
-  lockoutEnd: string | null;
-  lockoutEnabled: boolean;
-  accessFailedCount: number;
+  usuario: string;
+  nome: string;
+  presidente: boolean;
 }
 
 export interface AuthError {

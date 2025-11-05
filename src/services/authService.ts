@@ -13,11 +13,18 @@ export const authService = {
     try {
       const { data } = await api.post<LoginResponse>("/sign-in", credentials);
 
+      // Mescla os dados do currentUser com nome e presidente do LoginResponse
+      const userData = {
+        ...data.currentUser,
+        nome: data.nome || data.currentUser.nome,
+        presidente: data.presidente ?? data.currentUser.presidente,
+      };
+
       // Salva os dados no AsyncStorage
       await AsyncStorage.setItem(STORAGE_KEYS.ACCESS_TOKEN, data.accessToken);
       await AsyncStorage.setItem(
         STORAGE_KEYS.USER_DATA,
-        JSON.stringify(data.currentUser)
+        JSON.stringify(userData)
       );
       await AsyncStorage.setItem(
         STORAGE_KEYS.TOKEN_EXPIRATION,

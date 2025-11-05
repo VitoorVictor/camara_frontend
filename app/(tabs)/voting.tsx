@@ -37,6 +37,7 @@ export default function VotingScreen() {
   const [timerActive, setTimerActive] = useState(false);
   const [alreadyVoted, setAlreadyVoted] = useState(false);
   const [checkingVote, setCheckingVote] = useState(false);
+  const [sessaoProjetoId, setSessaoProjetoId] = useState<string | null>(null);
   const [confirmationModal, setConfirmationModal] = useState<{
     visible: boolean;
     title: string;
@@ -49,9 +50,6 @@ export default function VotingScreen() {
     voteType: null,
   });
 
-  // Mock do ID da sessão projeto (por enquanto fixo)
-  const SESSAO_PROJETO_ID = "b88e3c11-3b6c-4b3a-86b1-51494b60a0d9";
-
   // Busca projeto em votação
   useEffect(() => {
     if (activeSession?.id && activeSession.status === "EmAndamento") {
@@ -59,13 +57,13 @@ export default function VotingScreen() {
     }
   }, [activeSession?.id, activeSession?.status]);
 
-  // Verifica se já votou quando o projeto é carregado
+  // Verifica se já votou quando o projeto e sessaoProjetoId são carregados
   useEffect(() => {
-    if (votingProject?.id) {
+    if (votingProject?.id && sessaoProjetoId) {
       checkIfAlreadyVoted();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [votingProject?.id]);
+  }, [votingProject?.id, sessaoProjetoId]);
 
   // Timer countdown
   useEffect(() => {
@@ -96,26 +94,40 @@ export default function VotingScreen() {
         setTimer(60); // Inicia timer de 1 minuto
         setTimerActive(true);
         setAlreadyVoted(false); // Reset do estado ao carregar novo projeto
+
+        // Busca o sessaoProjetoId
+        try {
+          // const sessaoProjetoIdResult = await votingService.getSessaoProjetoId(
+          //   projectInVoting.id,
+          //   activeSession.id
+          // );
+          setSessaoProjetoId("b88e3c11-3b6c-4b3a-86b1-51494b60a0d9");
+        } catch (error) {
+          console.error("Erro ao buscar sessaoProjetoId:", error);
+          setSessaoProjetoId(null);
+        }
       } else {
         setVotingProject(null);
         setAlreadyVoted(false);
+        setSessaoProjetoId(null);
       }
     } catch (error) {
       console.error("Erro ao carregar projeto em votação:", error);
       setVotingProject(null);
       setAlreadyVoted(false);
+      setSessaoProjetoId(null);
     } finally {
       setLoading(false);
     }
   };
 
   const checkIfAlreadyVoted = async () => {
-    if (!votingProject) return;
+    if (!votingProject || !sessaoProjetoId) return;
 
     try {
       setCheckingVote(true);
       const hasVoted = await votingService.vereadorAlreadyVoteInProject(
-        SESSAO_PROJETO_ID
+        sessaoProjetoId
       );
       setAlreadyVoted(hasVoted);
       if (hasVoted) {

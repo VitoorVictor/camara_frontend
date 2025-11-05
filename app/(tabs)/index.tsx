@@ -12,9 +12,8 @@ import { useColorScheme } from "@/hooks/use-color-scheme";
 export default function HomeScreen() {
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme as keyof typeof Colors];
-  const { user, isAuthenticated } = useAuth();
+  const { user, isAuthenticated, presidente } = useAuth();
   const { initializeSession, isInitialized } = useSession();
-  const isPresident = true;
 
   // Inicializa a sessão apenas quando o usuário está autenticado e a tela está montada
   useEffect(() => {
@@ -71,7 +70,7 @@ export default function HomeScreen() {
         </View>
 
         <Header
-          userRole={isPresident ? "Presidente" : "Vereador"}
+          userRole={presidente ? "Presidente" : "Vereador"}
           onNotificationPress={handleNotificationPress}
           onProfilePress={handleProfilePress}
         />
@@ -79,7 +78,7 @@ export default function HomeScreen() {
         <View style={styles.topContent}>
           <View style={styles.greeting}>
             <Text style={styles.greetingText}>
-              Olá, {user?.nome + " " + user?.sobrenome || "Usuário"}!
+              Olá, {user?.nome || "Usuário"}!
             </Text>
           </View>
 
@@ -95,7 +94,7 @@ export default function HomeScreen() {
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.contentContainer}
       >
-        {!isPresident && (
+        {!presidente && (
           <ActionCard
             title="Sessão Aberta"
             subtitle="Votação de propostas"
@@ -103,7 +102,7 @@ export default function HomeScreen() {
             onPress={handleVotingPress}
           />
         )}
-        {isPresident && (
+        {presidente && (
           <>
             <ActionCard
               title="Sessões"

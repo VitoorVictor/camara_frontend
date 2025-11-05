@@ -28,7 +28,7 @@ export const sessionsService = {
    * Busca sessão em andamento
    */
   async getActiveSession(): Promise<Session> {
-    const { data } = await api.get<Session>("/sessao/get-sessao-em-andamento");
+    const { data } = await api.get<Session>("/Sessao/get-sessao-em-andamento");
     return data;
   },
 
@@ -56,7 +56,7 @@ export const sessionsService = {
 
     const queryString = queryParts.join("&");
     const { data } = await api.get<InfiniteRollSessionsResponse>(
-      `/sessao/infinite-roll-by-camara?${queryString}`
+      `/Sessao/infinite-roll-by-camara?${queryString}`
     );
     return data;
   },
@@ -65,7 +65,7 @@ export const sessionsService = {
    * Inicia uma sessão
    */
   async start(id: string): Promise<Session> {
-    const { data } = await api.put<Session>(`/sessao/abrir-sessao`, id);
+    const { data } = await api.put<Session>(`/Sessao/abrir-sessao`, id);
     return data;
   },
 
@@ -73,7 +73,7 @@ export const sessionsService = {
    * Finaliza uma sessão
    */
   async finish(id: string): Promise<Session> {
-    const { data } = await api.put<Session>(`/sessao/encerrar-sessao`, id);
+    const { data } = await api.put<Session>(`/Sessao/encerrar-sessao`, id);
     return data;
   },
 };

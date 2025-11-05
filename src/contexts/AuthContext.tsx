@@ -15,6 +15,8 @@ interface AuthContextData {
   signIn: (userName: string, password: string) => Promise<void>;
   signOut: () => Promise<void>;
   isAuthenticated: boolean;
+  nome: string | null;
+  presidente: boolean | null;
 }
 
 const AuthContext = createContext<AuthContextData>({} as AuthContextData);
@@ -26,6 +28,10 @@ interface AuthProviderProps {
 export function AuthProvider({ children }: AuthProviderProps) {
   const [user, setUser] = useState<CurrentUser | null>(null);
   const [loading, setLoading] = useState(true);
+
+  // Extrai nome e presidente do user para facilitar acesso
+  const nome = user?.nome || null;
+  const presidente = user?.presidente ?? null;
 
   useEffect(() => {
     loadStorageData();
@@ -65,7 +71,13 @@ export function AuthProvider({ children }: AuthProviderProps) {
     try {
       setLoading(true);
       const response = await authService.login({ userName, password });
-      setUser(response.currentUser);
+      // Mescla os dados do currentUser com nome e presidente do LoginResponse
+      const userData = {
+        ...response.currentUser,
+        nome: response.nome || response.currentUser.nome,
+        presidente: response.presidente ?? response.currentUser.presidente,
+      };
+      setUser(userData);
       // setUser({
       //   camara: null,
       //   camaraId: "658c5bd8-7ca0-482b-bbae-bd783c0c97c8",
@@ -118,6 +130,8 @@ export function AuthProvider({ children }: AuthProviderProps) {
         signIn,
         signOut,
         isAuthenticated: !!user,
+        nome,
+        presidente,
       }}
     >
       {children}

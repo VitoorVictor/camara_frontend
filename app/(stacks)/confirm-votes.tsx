@@ -46,21 +46,30 @@ export default function ConfirmVotesScreen() {
   // Estado para modal de finalizar votação
   const [finishVotingModal, setFinishVotingModal] = useState(false);
   const [updatingProjectStatus, setUpdatingProjectStatus] = useState(false);
-
-  // Mock do ID da sessão projeto
-  const SESSAO_PROJETO_ID = "b88e3c11-3b6c-4b3a-86b1-51494b60a0d9";
+  const [sessaoProjetoId, setSessaoProjetoId] = useState<string | null>(null);
 
   useEffect(() => {
-    loadVereadoresData();
     loadProject();
   }, [activeSession?.id]);
 
+  useEffect(() => {
+    if (sessaoProjetoId) {
+      loadVereadoresData();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sessaoProjetoId]);
+
   const loadVereadoresData = async () => {
+    if (!sessaoProjetoId) {
+      setLoading(false);
+      return;
+    }
+
     try {
       setLoading(true);
       setError(null);
       const response = await votingService.listVereadoresByVotosInSessaoProjeto(
-        SESSAO_PROJETO_ID
+        sessaoProjetoId
       );
       setData(response);
     } catch (err: any) {
@@ -71,8 +80,8 @@ export default function ConfirmVotesScreen() {
     }
   };
 
-  const loadProject = async () => {
-    if (!activeSession?.id) return;
+  const loadProject = async (): Promise<string | null> => {
+    if (!activeSession?.id) return null;
 
     try {
       const projects = await projectsService.getBySession(activeSession.id);
@@ -80,15 +89,43 @@ export default function ConfirmVotesScreen() {
       const projectInVoting = projects.find((p) => p.status === "EmVotacao");
       if (projectInVoting) {
         setProject(projectInVoting);
+
+        // Busca o sessaoProjetoId
+        try {
+          // const sessaoProjetoIdResult = await votingService.getSessaoProjetoId(
+          //   projectInVoting.id,
+          //   activeSession.id
+          // );
+          setSessaoProjetoId("b88e3c11-3b6c-4b3a-86b1-51494b60a0d9");
+          return "b88e3c11-3b6c-4b3a-86b1-51494b60a0d9";
+        } catch (error) {
+          console.error("Erro ao buscar sessaoProjetoId:", error);
+          setSessaoProjetoId(null);
+          return null;
+        }
+      } else {
+        setProject(null);
+        setSessaoProjetoId(null);
+        return null;
       }
     } catch (error) {
       console.error("Erro ao carregar projeto:", error);
+      setSessaoProjetoId(null);
+      return null;
     }
   };
 
   const handleRefresh = async () => {
     setRefreshing(true);
-    await Promise.all([loadVereadoresData(), loadProject()]);
+    // Primeiro carrega o projeto (que busca o sessaoProjetoId)
+    const sessaoProjetoIdResult = await loadProject();
+    // Depois carrega os dados dos vereadores usando o sessaoProjetoId retornado
+    if (sessaoProjetoIdResult) {
+      const response = await votingService.listVereadoresByVotosInSessaoProjeto(
+        sessaoProjetoIdResult
+      );
+      setData(response);
+    }
     setRefreshing(false);
   };
 
@@ -98,10 +135,10 @@ export default function ConfirmVotesScreen() {
 
   const handleConfirmAcceptAll = async () => {
     setAcceptAllModal(false);
-    if (!data) return;
+    if (!data || !sessaoProjetoId) return;
 
     try {
-      await votingService.confirmAllVotes(SESSAO_PROJETO_ID);
+      await votingService.confirmAllVotes(sessaoProjetoId);
       Alert.alert("Sucesso", "Todos os votos foram aceitos!");
       loadVereadoresData();
     } catch (error: any) {
@@ -114,11 +151,11 @@ export default function ConfirmVotesScreen() {
   };
 
   const handleConfirmAcceptVote = async () => {
-    if (!acceptVoteModal) return;
+    if (!acceptVoteModal || !sessaoProjetoId) return;
 
     try {
       await votingService.confirmVote(
-        SESSAO_PROJETO_ID,
+        sessaoProjetoId,
         acceptVoteModal.vereadorVotante.id
       );
       Alert.alert("Sucesso", "Voto aceito com sucesso!");

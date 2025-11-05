@@ -21,7 +21,7 @@ export const projectsService = {
    * Lista todos os projetos
    */
   async getAll(): Promise<Project[]> {
-    const { data } = await api.get<Project[]>("/projects");
+    const { data } = await api.get<Project[]>("/Projects");
     return data;
   },
 
@@ -29,7 +29,7 @@ export const projectsService = {
    * Busca um projeto por ID
    */
   async getById(id: string): Promise<Project> {
-    const { data } = await api.get<Project>(`/projects/${id}`);
+    const { data } = await api.get<Project>(`/Projects/${id}`);
     return data;
   },
 
@@ -39,7 +39,7 @@ export const projectsService = {
   async getBySession(sessionId: string): Promise<Project[]> {
     // TODO: Descomentar quando API estiver pronta
     const { data } = await api.get<Project[]>(
-      `/sessao/list-projetos-by-sessao?id=${sessionId}`
+      `/Sessao/list-projetos-by-sessao?id=${sessionId}`
     );
     return data;
   },
@@ -58,7 +58,7 @@ export const projectsService = {
    * Atualiza o status de um projeto
    */
   async updateStatus(projetoId: string, status: string): Promise<void> {
-    await api.put(`/projeto/update-projeto-status-by-current-vereador`, {
+    await api.put(`/Projeto/update-projeto-status-by-current-vereador`, {
       projetoId,
       status,
     });

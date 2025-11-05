@@ -47,7 +47,7 @@ export const votingService = {
     sessaoId: string,
     tipoVoto: "Sim" | "Nao" | "Abstencao"
   ): Promise<void> {
-    await api.put(`/projeto/votar-no-projeto`, {
+    await api.put(`/Projeto/votar-no-projeto`, {
       projetoId,
       sessaoId,
       tipoVoto,
@@ -61,7 +61,7 @@ export const votingService = {
     sessaoProjetoId: string,
     vereadorVotanteId: string
   ): Promise<void> {
-    await api.put(`/voto/confirmar-voto`, {
+    await api.put(`/Voto/confirmar-voto`, {
       sessaoProjetoId,
       vereadorVotanteId,
     });
@@ -71,9 +71,7 @@ export const votingService = {
    * Confirma todos os votos de uma sessão-projeto
    */
   async confirmAllVotes(sessaoProjetoId: string): Promise<void> {
-    await api.put(`/Voto/confirmar-todos-votos`, {
-      sessaoProjetoId,
-    });
+    await api.put(`/Voto/confirmar-todos-voto`, sessaoProjetoId);
   },
 
   /**
@@ -84,6 +82,19 @@ export const votingService = {
   ): Promise<boolean> {
     const { data } = await api.get<boolean>(
       `/Voto/vereador-already-vote-in-this-projeto?sessaoProjetoId=${sessaoProjetoId}`
+    );
+    return data;
+  },
+
+  /**
+   * Busca o ID da sessão-projeto pelo projeto e sessão
+   */
+  async getSessaoProjetoId(
+    projetoId: string,
+    sessaoId: string
+  ): Promise<string> {
+    const { data } = await api.get<string>(
+      `/SessaoProjeto/read-by-projeto-and-sessao?projetoId=${projetoId}&sessaoId=${sessaoId}`
     );
     return data;
   },
