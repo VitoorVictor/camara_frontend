@@ -6,17 +6,20 @@ import React, {
   useState,
 } from "react";
 
+import { ChangePasswordModal } from "@/components/common/ChangePasswordModal";
 import { authService } from "@/services/authService";
-import { CurrentUser } from "@/types/api.types";
+import { CamaraDTO, CurrentUser } from "@/types/api.types";
 
 interface AuthContextData {
   user: CurrentUser | null;
+  camara: CamaraDTO | null;
   loading: boolean;
   signIn: (userName: string, password: string) => Promise<void>;
   signOut: () => Promise<void>;
   isAuthenticated: boolean;
   nome: string | null;
   presidente: boolean | null;
+  changePassword: (password: string, confirmPassword: string) => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextData>({} as AuthContextData);
@@ -27,7 +30,9 @@ interface AuthProviderProps {
 
 export function AuthProvider({ children }: AuthProviderProps) {
   const [user, setUser] = useState<CurrentUser | null>(null);
+  const [camara, setCamara] = useState<CamaraDTO | null>(null);
   const [loading, setLoading] = useState(true);
+  const [showChangePasswordModal, setShowChangePasswordModal] = useState(false);
 
   // Extrai nome e presidente do user para facilitar acesso
   const nome = user?.nome || null;
@@ -46,8 +51,16 @@ export function AuthProvider({ children }: AuthProviderProps) {
       if (isAuth) {
         // Token válido encontrado, restaura os dados do usuário
         const storedUser = await authService.getCurrentUser();
+        const storedCamara = await authService.getCamaraData();
         if (storedUser) {
           setUser(storedUser);
+          setCamara(storedCamara);
+
+          // Verifica se precisa alterar a senha (persistente após refresh)
+          const passwordReseted = await authService.isPasswordReseted();
+          if (passwordReseted) {
+            setShowChangePasswordModal(true);
+          }
         } else {
           // Se não houver dados do usuário mas o token existe, limpa tudo
           await authService.logout();
@@ -56,12 +69,14 @@ export function AuthProvider({ children }: AuthProviderProps) {
         // Token inválido ou expirado, limpa os dados
         await authService.logout();
         setUser(null);
+        setCamara(null);
       }
     } catch (error) {
       console.error("Erro ao carregar dados do usuário:", error);
       // Em caso de erro, limpa os dados para garantir segurança
       await authService.logout();
       setUser(null);
+      setCamara(null);
     } finally {
       setLoading(false);
     }
@@ -78,30 +93,12 @@ export function AuthProvider({ children }: AuthProviderProps) {
         presidente: response.presidente ?? response.currentUser.presidente,
       };
       setUser(userData);
-      // setUser({
-      //   camara: null,
-      //   camaraId: "658c5bd8-7ca0-482b-bbae-bd783c0c97c8",
-      //   nome: "Vereadore",
-      //   sobrenome: "Presidente",
-      //   createdAt: "2025-10-27T22:14:18.439174",
-      //   updatedAt: null,
-      //   id: "c3a256ef-a94c-429e-9e20-9562b0d5f330",
-      //   userName: "vereadorpresidente",
-      //   normalizedUserName: "VEREADORPRESIDENTE",
-      //   email: "presidente@exemplo.com",
-      //   normalizedEmail: "PRESIDENTE@EXEMPLO.COM",
-      //   emailConfirmed: true,
-      //   passwordHash:
-      //     "AQAAAAIAAYagAAAAEKCGuIORMeDoaMTPZl67TlTFWWgGnImrIhTY7OtN2M8Q2rECPG8pAR6OOJ9dENrmUA==",
-      //   securityStamp: "EJ4ZPDEESYSKQDALEBZ6NNEDVEPXGQGI",
-      //   concurrencyStamp: "80d9f748-1d10-432b-a5cb-546f4b206873",
-      //   phoneNumber: "11877777777",
-      //   phoneNumberConfirmed: true,
-      //   twoFactorEnabled: false,
-      //   lockoutEnd: null,
-      //   lockoutEnabled: true,
-      //   accessFailedCount: 0,
-      // });
+      setCamara(response.camaraDTO);
+
+      // Verifica se precisa alterar a senha
+      if (response.passwordReseted) {
+        setShowChangePasswordModal(true);
+      }
     } catch (error: any) {
       throw error;
     } finally {
@@ -109,11 +106,22 @@ export function AuthProvider({ children }: AuthProviderProps) {
     }
   }
 
+  async function changePassword(
+    password: string,
+    confirmPassword: string
+  ): Promise<void> {
+    await authService.changePassword({ password, confirmPassword });
+    setShowChangePasswordModal(false);
+    // Faz logout após alterar a senha com sucesso
+    await signOut();
+  }
+
   async function signOut() {
     try {
       setLoading(true);
       await authService.logout();
       setUser(null);
+      setCamara(null);
     } catch (error) {
       console.error("Erro ao fazer logout:", error);
       throw error;
@@ -126,15 +134,22 @@ export function AuthProvider({ children }: AuthProviderProps) {
     <AuthContext.Provider
       value={{
         user,
+        camara,
         loading,
         signIn,
         signOut,
         isAuthenticated: !!user,
         nome,
         presidente,
+        changePassword,
       }}
     >
       {children}
+      <ChangePasswordModal
+        visible={showChangePasswordModal}
+        onSuccess={() => setShowChangePasswordModal(false)}
+        onChangePassword={changePassword}
+      />
     </AuthContext.Provider>
   );
 }

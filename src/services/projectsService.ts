@@ -57,10 +57,31 @@ export const projectsService = {
   /**
    * Atualiza o status de um projeto
    */
-  async updateStatus(projetoId: string, status: string): Promise<void> {
+  async updateStatus(sessaoId: string, projetoId: string, status: string): Promise<void> {
     await api.put(`/Projeto/update-projeto-status-by-current-vereador`, {
+      sessaoId,
       projetoId,
       status,
     });
+  },
+
+  /**
+   * Confirma um voto
+   */
+  async confirmVote(
+    sessaoProjetoId: string,
+    vereadorVotanteId: string
+  ): Promise<void> {
+    await api.put(`/Projeto/confirmar-voto`, {
+      sessaoProjetoId,
+      vereadorVotanteId,
+    });
+  },
+
+  /**
+   * Confirma todos os votos de uma sessão-projeto
+   */
+  async confirmAllVotes(sessaoProjetoId: string): Promise<void> {
+    await api.put(`/Projeto/confirmar-todos-voto`, sessaoProjetoId);
   },
 };

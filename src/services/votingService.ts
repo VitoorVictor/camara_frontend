@@ -55,26 +55,6 @@ export const votingService = {
   },
 
   /**
-   * Confirma um voto
-   */
-  async confirmVote(
-    sessaoProjetoId: string,
-    vereadorVotanteId: string
-  ): Promise<void> {
-    await api.put(`/Voto/confirmar-voto`, {
-      sessaoProjetoId,
-      vereadorVotanteId,
-    });
-  },
-
-  /**
-   * Confirma todos os votos de uma sessão-projeto
-   */
-  async confirmAllVotes(sessaoProjetoId: string): Promise<void> {
-    await api.put(`/Voto/confirmar-todos-voto`, sessaoProjetoId);
-  },
-
-  /**
    * Verifica se o vereador já votou no projeto
    */
   async vereadorAlreadyVoteInProject(
@@ -93,9 +73,9 @@ export const votingService = {
     projetoId: string,
     sessaoId: string
   ): Promise<string> {
-    const { data } = await api.get<string>(
+    const { data } = await api.get<{ id: string }>(
       `/SessaoProjeto/read-by-projeto-and-sessao?projetoId=${projetoId}&sessaoId=${sessaoId}`
     );
-    return data;
+    return data.id;
   },
 };

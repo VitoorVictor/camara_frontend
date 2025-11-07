@@ -9,6 +9,8 @@ export const STORAGE_KEYS = {
   ACCESS_TOKEN: "@app:accessToken",
   USER_DATA: "@app:userData",
   TOKEN_EXPIRATION: "@app:tokenExpiration",
+  CAMARA_DATA: "@app:camaraData",
+  PASSWORD_RESETED: "@app:passwordReseted",
 };
 
 // Instância do axios
@@ -54,6 +56,8 @@ api.interceptors.response.use(
           STORAGE_KEYS.ACCESS_TOKEN,
           STORAGE_KEYS.USER_DATA,
           STORAGE_KEYS.TOKEN_EXPIRATION,
+          STORAGE_KEYS.CAMARA_DATA,
+          STORAGE_KEYS.PASSWORD_RESETED,
         ]);
         // Você pode emitir um evento ou usar navigation aqui para redirecionar
       }

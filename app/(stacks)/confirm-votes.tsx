@@ -56,7 +56,6 @@ export default function ConfirmVotesScreen() {
     if (sessaoProjetoId) {
       loadVereadoresData();
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sessaoProjetoId]);
 
   const loadVereadoresData = async () => {
@@ -92,12 +91,12 @@ export default function ConfirmVotesScreen() {
 
         // Busca o sessaoProjetoId
         try {
-          // const sessaoProjetoIdResult = await votingService.getSessaoProjetoId(
-          //   projectInVoting.id,
-          //   activeSession.id
-          // );
-          setSessaoProjetoId("b88e3c11-3b6c-4b3a-86b1-51494b60a0d9");
-          return "b88e3c11-3b6c-4b3a-86b1-51494b60a0d9";
+          const sessaoProjetoIdResult = await votingService.getSessaoProjetoId(
+            projectInVoting.id,
+            activeSession.id
+          );
+          setSessaoProjetoId(sessaoProjetoIdResult);
+          return sessaoProjetoIdResult;
         } catch (error) {
           console.error("Erro ao buscar sessaoProjetoId:", error);
           setSessaoProjetoId(null);
@@ -138,7 +137,7 @@ export default function ConfirmVotesScreen() {
     if (!data || !sessaoProjetoId) return;
 
     try {
-      await votingService.confirmAllVotes(sessaoProjetoId);
+      await projectsService.confirmAllVotes(sessaoProjetoId);
       Alert.alert("Sucesso", "Todos os votos foram aceitos!");
       loadVereadoresData();
     } catch (error: any) {
@@ -154,7 +153,7 @@ export default function ConfirmVotesScreen() {
     if (!acceptVoteModal || !sessaoProjetoId) return;
 
     try {
-      await votingService.confirmVote(
+      await projectsService.confirmVote(
         sessaoProjetoId,
         acceptVoteModal.vereadorVotante.id
       );
@@ -172,12 +171,16 @@ export default function ConfirmVotesScreen() {
   };
 
   const handleConfirmFinishApprove = async () => {
-    if (!project) return;
+    if (!project || !activeSession?.id) return;
     setFinishVotingModal(false);
 
     try {
       setUpdatingProjectStatus(true);
-      await projectsService.updateStatus(project.id, "Aprovado");
+      await projectsService.updateStatus(
+        activeSession.id,
+        project.id,
+        "Aprovado"
+      );
       Alert.alert("Sucesso", "Projeto marcado como aprovado!");
       await Promise.all([loadProject(), loadVereadoresData()]);
     } catch (error: any) {
@@ -188,12 +191,16 @@ export default function ConfirmVotesScreen() {
   };
 
   const handleConfirmFinishReject = async () => {
-    if (!project) return;
+    if (!project || !activeSession?.id) return;
     setFinishVotingModal(false);
 
     try {
       setUpdatingProjectStatus(true);
-      await projectsService.updateStatus(project.id, "Rejeitado");
+      await projectsService.updateStatus(
+        activeSession.id,
+        project.id,
+        "Rejeitado"
+      );
       Alert.alert("Sucesso", "Projeto marcado como rejeitado!");
       await Promise.all([loadProject(), loadVereadoresData()]);
     } catch (error: any) {

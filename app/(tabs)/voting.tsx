@@ -97,11 +97,11 @@ export default function VotingScreen() {
 
         // Busca o sessaoProjetoId
         try {
-          // const sessaoProjetoIdResult = await votingService.getSessaoProjetoId(
-          //   projectInVoting.id,
-          //   activeSession.id
-          // );
-          setSessaoProjetoId("b88e3c11-3b6c-4b3a-86b1-51494b60a0d9");
+          const sessaoProjetoIdResult = await votingService.getSessaoProjetoId(
+            projectInVoting.id,
+            activeSession.id
+          );
+          setSessaoProjetoId(sessaoProjetoIdResult);
         } catch (error) {
           console.error("Erro ao buscar sessaoProjetoId:", error);
           setSessaoProjetoId(null);

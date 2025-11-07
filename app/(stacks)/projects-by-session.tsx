@@ -144,11 +144,12 @@ export default function ProjectsBySessionScreen() {
   };
 
   const handleConfirmStatusUpdate = async () => {
-    if (!confirmationModal.projetoId) return;
+    if (!confirmationModal.projetoId || !activeSession?.id) return;
 
     try {
       setUpdatingStatus(true);
       await projectsService.updateStatus(
+        activeSession.id,
         confirmationModal.projetoId,
         "EmVotacao"
       );

@@ -32,10 +32,19 @@ export interface LoginRequest {
 // Tipos específicos para sua API
 export interface LoginResponse {
   accessToken: string;
-  expiration: string;
+  camaraDTO: CamaraDTO;
   currentUser: CurrentUser;
+  expiration: string;
   nome: string;
+  passwordReseted: boolean;
   presidente: boolean;
+}
+
+export interface CamaraDTO {
+  cidade: string;
+  estado: string;
+  id: string;
+  nome: string;
 }
 
 export interface CurrentUser {
@@ -49,4 +58,9 @@ export interface CurrentUser {
 export interface AuthError {
   message: string;
   statusCode?: number;
+}
+
+export interface ChangePasswordRequest {
+  password: string;
+  confirmPassword: string;
 }
