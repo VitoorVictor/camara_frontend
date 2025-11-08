@@ -2,6 +2,7 @@ import { ConfirmationModal } from "@/components/common/ConfirmationModal";
 import { DatePicker } from "@/components/common/DatePicker";
 import { SearchBar } from "@/components/common/SearchBar";
 import { Spinner } from "@/components/common/Spinner";
+import { IconSymbol } from "@/components/ui/icon-symbol";
 import {
   BorderRadius,
   Colors,
@@ -16,7 +17,9 @@ import {
   Session,
   sessionsService,
 } from "@/services/sessionsService";
+import { useAuth } from "@/src/contexts/AuthContext";
 import { formatDate } from "@/src/utils/formatters";
+import { router } from "expo-router";
 import React, { useCallback, useEffect, useState } from "react";
 import {
   FlatList,
@@ -32,7 +35,8 @@ const STATUS_OPTIONS = ["EmAndamento", "Agendada", "Encerrada", "Cancelada"];
 export default function SessionsScreen() {
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme as keyof typeof Colors];
-  const { refreshSession } = useSession(); // Para atualizar a sessão ativa após abrir/encerrar
+  const { refreshSession } = useSession();
+  const { presidente } = useAuth();
   const [sessions, setSessions] = useState<Session[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
@@ -212,6 +216,9 @@ export default function SessionsScreen() {
           resetAndLoadSessions(); // Recarrega a lista de sessões
           // Atualiza a sessão ativa no contexto
           await refreshSession();
+          if (presidente) {
+            router.push("/(stacks)/projects-by-session");
+          }
         } catch (error) {
           console.error("Erro ao abrir sessão:", error);
           setConfirmationModal({
@@ -348,6 +355,8 @@ export default function SessionsScreen() {
     return <Spinner size="small" />;
   };
 
+  const hasSearchFilters = Boolean(filters.nome || filters.data);
+
   const renderListHeader = () => (
     <>
       {/* Filtro por status */}
@@ -429,12 +438,25 @@ export default function SessionsScreen() {
           onClearAll={handleClearAll}
           loading={searchLoading}
         />
-        <DatePicker
-          value={filters.data}
-          onChange={handleDateChange}
-          onClear={handleClearDate}
-          placeholder="Data"
-        />
+        <View style={styles.dateAndActionsContainer}>
+          <DatePicker
+            value={filters.data}
+            onChange={handleDateChange}
+            onClear={handleClearDate}
+            placeholder="Data"
+          />
+          {hasSearchFilters && (
+            <TouchableOpacity
+              style={[
+                styles.clearFiltersButton,
+                { backgroundColor: colors.error },
+              ]}
+              onPress={clearFilters}
+            >
+              <IconSymbol name="trash" size={18} color="#ffffff" />
+            </TouchableOpacity>
+          )}
+        </View>
       </View>
 
       {/* Lista de Sessões */}
@@ -520,6 +542,11 @@ const styles = StyleSheet.create({
   },
   searchDateContainer: {
     marginBottom: Spacing.md,
+    gap: Spacing.sm,
+  },
+  dateAndActionsContainer: {
+    flexDirection: "row",
+    alignItems: "stretch",
     gap: Spacing.sm,
   },
   statusButtonText: {
@@ -620,5 +647,11 @@ const styles = StyleSheet.create({
     fontSize: FontSizes.md,
     fontWeight: FontWeights.semibold,
     color: "#ffffff",
+  },
+  clearFiltersButton: {
+    width: 48,
+    borderRadius: BorderRadius.md,
+    justifyContent: "center",
+    alignItems: "center",
   },
 });

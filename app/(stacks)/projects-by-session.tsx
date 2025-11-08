@@ -11,6 +11,7 @@ import {
 import { useSession } from "@/contexts/SessionContext";
 import { useColorScheme } from "@/hooks/use-color-scheme";
 import { Project, projectsService } from "@/services/projectsService";
+import { useAuth } from "@/src/contexts/AuthContext";
 import { formatDate } from "@/utils/formatters";
 import { router } from "expo-router";
 import React, { useEffect, useState } from "react";
@@ -32,6 +33,7 @@ export default function ProjectsBySessionScreen() {
     loading: sessionLoading,
     refreshSession,
   } = useSession();
+  const { presidente } = useAuth();
   const [projects, setProjects] = useState<Project[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -165,6 +167,9 @@ export default function ProjectsBySessionScreen() {
 
       handleCloseConfirmation();
       Alert.alert("Sucesso", "Status do projeto atualizado com sucesso!");
+      if (presidente) {
+        router.push("/(tabs)/voting");
+      }
     } catch (error: any) {
       console.error("Erro ao atualizar status:", error);
       Alert.alert(

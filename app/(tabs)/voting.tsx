@@ -25,6 +25,7 @@ import { useColorScheme } from "@/hooks/use-color-scheme";
 import { Project, projectsService } from "@/services/projectsService";
 import { votingService } from "@/services/votingService";
 import { useAuth } from "@/src/contexts/AuthContext";
+import { router } from "expo-router";
 
 export default function VotingScreen() {
   const colorScheme = useColorScheme();
@@ -202,6 +203,9 @@ export default function VotingScreen() {
 
       // Verifica se já votou e atualiza o estado
       await checkIfAlreadyVoted();
+      if (presidente) {
+        router.push("/(stacks)/confirm-votes");
+      }
     } catch (error: any) {
       console.error("Erro ao registrar voto:", error);
       Alert.alert(

@@ -17,7 +17,9 @@ import {
   VotosPorSessaoProjeto,
   votingService,
 } from "@/services/votingService";
+import { useAuth } from "@/src/contexts/AuthContext";
 import { formatDate } from "@/utils/formatters";
+import { router } from "expo-router";
 import React, { useEffect, useMemo, useState } from "react";
 import {
   Alert,
@@ -36,6 +38,7 @@ export default function ConfirmVotesScreen() {
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme as keyof typeof Colors];
   const { activeSession } = useSession();
+  const { presidente } = useAuth();
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [data, setData] = useState<VotosPorSessaoProjeto | null>(null);
@@ -278,6 +281,9 @@ export default function ConfirmVotesScreen() {
       Alert.alert("Sucesso", "Projeto marcado como aprovado!");
       await loadProject();
       await loadVereadoresData();
+      if (presidente) {
+        router.push("/(stacks)/projects-by-session");
+      }
     } catch (error: any) {
       Alert.alert("Erro", error.message || "Erro ao aprovar o projeto");
     } finally {
@@ -299,6 +305,9 @@ export default function ConfirmVotesScreen() {
       Alert.alert("Sucesso", "Projeto marcado como rejeitado!");
       await loadProject();
       await loadVereadoresData();
+      if (presidente) {
+        router.push("/(stacks)/projects-by-session");
+      }
     } catch (error: any) {
       Alert.alert("Erro", error.message || "Erro ao rejeitar o projeto");
     } finally {
