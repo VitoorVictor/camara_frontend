@@ -24,13 +24,13 @@ import { useSession } from "@/contexts/SessionContext";
 import { useColorScheme } from "@/hooks/use-color-scheme";
 import { Project, projectsService } from "@/services/projectsService";
 import { votingService } from "@/services/votingService";
+import { useAuth } from "@/src/contexts/AuthContext";
 
 export default function VotingScreen() {
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme as keyof typeof Colors];
-  const isPresident = false; // Para mostrar o header de vereador
   const { activeSession, loading: sessionLoading } = useSession();
-
+  const { presidente } = useAuth();
   const [votingProject, setVotingProject] = useState<Project | null>(null);
   const [loading, setLoading] = useState(false);
   const [timer, setTimer] = useState(60); // Timer de 60 segundos
@@ -89,7 +89,10 @@ export default function VotingScreen() {
       setLoading(true);
       const projectInVoting = await projectsService.getByStatusEmVotacao();
 
-      if (projectInVoting) {
+      if (
+        projectInVoting &&
+        projectInVoting.id !== "00000000-0000-0000-0000-000000000000"
+      ) {
         setVotingProject(projectInVoting);
         setTimer(60); // Inicia timer de 1 minuto
         setTimerActive(true);
@@ -229,7 +232,7 @@ export default function VotingScreen() {
       <View style={[styles.container, { backgroundColor: colors.secondary }]}>
         <View style={styles.topSection}>
           <Header
-            userRole={isPresident ? "Presidente" : "Vereador"}
+            userRole={presidente ? "Presidente" : "Vereador"}
             onNotificationPress={handleNotificationPress}
             onProfilePress={handleProfilePress}
           />
@@ -253,7 +256,7 @@ export default function VotingScreen() {
       <View style={[styles.container, { backgroundColor: colors.secondary }]}>
         <View style={styles.topSection}>
           <Header
-            userRole={isPresident ? "Presidente" : "Vereador"}
+            userRole={presidente ? "Presidente" : "Vereador"}
             onNotificationPress={handleNotificationPress}
             onProfilePress={handleProfilePress}
           />
@@ -273,7 +276,7 @@ export default function VotingScreen() {
       <View style={[styles.container, { backgroundColor: colors.secondary }]}>
         <View style={styles.topSection}>
           <Header
-            userRole={isPresident ? "Presidente" : "Vereador"}
+            userRole={presidente ? "Presidente" : "Vereador"}
             onNotificationPress={handleNotificationPress}
             onProfilePress={handleProfilePress}
           />
@@ -297,7 +300,7 @@ export default function VotingScreen() {
       <View style={[styles.container, { backgroundColor: colors.secondary }]}>
         <View style={styles.topSection}>
           <Header
-            userRole={isPresident ? "Presidente" : "Vereador"}
+            userRole={presidente ? "Presidente" : "Vereador"}
             onNotificationPress={handleNotificationPress}
             onProfilePress={handleProfilePress}
           />
@@ -329,7 +332,7 @@ export default function VotingScreen() {
         </View>
 
         <Header
-          userRole={isPresident ? "Presidente" : "Vereador"}
+          userRole={presidente ? "Presidente" : "Vereador"}
           onNotificationPress={handleNotificationPress}
           onProfilePress={handleProfilePress}
         />

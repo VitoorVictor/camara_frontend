@@ -6,15 +6,17 @@ import React, {
   useState,
 } from "react";
 
-import { ChangePasswordModal } from "@/components/common/ChangePasswordModal";
 import { authService } from "@/services/authService";
-import { CamaraDTO, CurrentUser } from "@/types/api.types";
+import { CamaraDTO, CurrentUser, LoginResponse } from "@/types/api.types";
 
 interface AuthContextData {
   user: CurrentUser | null;
   camara: CamaraDTO | null;
   loading: boolean;
-  signIn: (userName: string, password: string) => Promise<void>;
+  signIn: (
+    userName: string,
+    password: string
+  ) => Promise<{ passwordReseted: boolean }>;
   signOut: () => Promise<void>;
   isAuthenticated: boolean;
   nome: string | null;
@@ -32,7 +34,6 @@ export function AuthProvider({ children }: AuthProviderProps) {
   const [user, setUser] = useState<CurrentUser | null>(null);
   const [camara, setCamara] = useState<CamaraDTO | null>(null);
   const [loading, setLoading] = useState(true);
-  const [showChangePasswordModal, setShowChangePasswordModal] = useState(false);
 
   // Extrai nome e presidente do user para facilitar acesso
   const nome = user?.nome || null;
@@ -53,14 +54,17 @@ export function AuthProvider({ children }: AuthProviderProps) {
         const storedUser = await authService.getCurrentUser();
         const storedCamara = await authService.getCamaraData();
         if (storedUser) {
-          setUser(storedUser);
-          setCamara(storedCamara);
-
           // Verifica se precisa alterar a senha (persistente após refresh)
           const passwordReseted = await authService.isPasswordReseted();
           if (passwordReseted) {
-            setShowChangePasswordModal(true);
+            await authService.logout();
+            setUser(null);
+            setCamara(null);
+            return;
           }
+
+          setUser(storedUser);
+          setCamara(storedCamara);
         } else {
           // Se não houver dados do usuário mas o token existe, limpa tudo
           await authService.logout();
@@ -82,7 +86,10 @@ export function AuthProvider({ children }: AuthProviderProps) {
     }
   }
 
-  async function signIn(userName: string, password: string) {
+  async function signIn(
+    userName: string,
+    password: string
+  ): Promise<{ passwordReseted: boolean }> {
     try {
       setLoading(true);
       const response = await authService.login({ userName, password });
@@ -92,13 +99,14 @@ export function AuthProvider({ children }: AuthProviderProps) {
         nome: response.nome || response.currentUser.nome,
         presidente: response.presidente ?? response.currentUser.presidente,
       };
-      setUser(userData);
-      setCamara(response.camaraDTO);
-
-      // Verifica se precisa alterar a senha
-      if (response.passwordReseted) {
-        setShowChangePasswordModal(true);
+      if (!response.passwordReseted) {
+        setUser(userData);
+        setCamara(response.camaraDTO);
+      } else {
+        setUser(null);
+        setCamara(null);
       }
+      return { passwordReseted: response.passwordReseted };
     } catch (error: any) {
       throw error;
     } finally {
@@ -111,7 +119,6 @@ export function AuthProvider({ children }: AuthProviderProps) {
     confirmPassword: string
   ): Promise<void> {
     await authService.changePassword({ password, confirmPassword });
-    setShowChangePasswordModal(false);
     // Faz logout após alterar a senha com sucesso
     await signOut();
   }
@@ -145,11 +152,6 @@ export function AuthProvider({ children }: AuthProviderProps) {
       }}
     >
       {children}
-      <ChangePasswordModal
-        visible={showChangePasswordModal}
-        onSuccess={() => setShowChangePasswordModal(false)}
-        onChangePassword={changePassword}
-      />
     </AuthContext.Provider>
   );
 }

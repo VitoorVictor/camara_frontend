@@ -36,7 +36,7 @@ export function Header({
           onPress={onNotificationPress}
           activeOpacity={0.7}
         >
-          <IconSymbol name="bell" size={32} color="#ffffff" />
+          <IconSymbol name="bell" size={32} color={colors.secondary} />
         </TouchableOpacity>
 
         <View style={styles.userInfo}>

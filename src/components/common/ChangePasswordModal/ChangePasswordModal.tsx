@@ -7,6 +7,7 @@ import {
   Spacing,
 } from "@/constants/theme";
 import { useColorScheme } from "@/hooks/use-color-scheme";
+import { Ionicons } from "@expo/vector-icons";
 import React, { useState } from "react";
 import {
   Alert,
@@ -52,6 +53,13 @@ export function ChangePasswordModal({
       newErrors.password = "A senha deve ter pelo menos 6 caracteres";
     } else if (!/\d/.test(password)) {
       newErrors.password = "A senha deve conter pelo menos um número";
+    } else if (!/[A-Z]/.test(password)) {
+      newErrors.password = "A senha deve conter pelo menos uma letra maiúscula";
+    } else if (!/[a-z]/.test(password)) {
+      newErrors.password = "A senha deve conter pelo menos uma letra minúscula";
+    } else if (!/[^A-Za-z0-9]/.test(password)) {
+      newErrors.password =
+        "A senha deve conter pelo menos um caractere especial";
     }
 
     if (!confirmPassword) {
@@ -137,8 +145,9 @@ export function ChangePasswordModal({
                 color={colors.primary}
               />
               <Text style={[styles.helpText, { color: colors.secondaryText }]}>
-                A senha deve ter no mínimo 6 caracteres e conter pelo menos um
-                número
+                A senha deve ter no mínimo 6 caracteres, incluir letras
+                maiúsculas e minúsculas, pelo menos um número e um caractere
+                especial.
               </Text>
             </View>
 
@@ -151,13 +160,16 @@ export function ChangePasswordModal({
                   style={[
                     styles.inputWrapper,
                     {
-                      backgroundColor: "#ffffff",
-                      borderColor: errors.password
-                        ? colors.error
-                        : colors.border,
+                      borderColor: errors.password ? colors.error : "#E5E7EB",
                     },
                   ]}
                 >
+                  <Ionicons
+                    name="lock-closed-outline"
+                    size={20}
+                    color="#9CA3AF"
+                    style={styles.inputIcon}
+                  />
                   <TextInput
                     style={[styles.input, { color: colors.primaryText }]}
                     value={password}
@@ -167,8 +179,8 @@ export function ChangePasswordModal({
                         setErrors({ ...errors, password: undefined });
                       }
                     }}
-                    placeholder="Digite sua nova senha"
-                    placeholderTextColor={colors.disabledText}
+                    placeholder="Nova senha"
+                    placeholderTextColor="#9CA3AF"
                     secureTextEntry={!showPassword}
                     autoCapitalize="none"
                     editable={!loading}
@@ -178,10 +190,10 @@ export function ChangePasswordModal({
                     style={styles.eyeButton}
                     activeOpacity={0.7}
                   >
-                    <IconSymbol
-                      name={showPassword ? "eye.slash.fill" : "eye.fill"}
-                      size={22}
-                      color={colors.primary}
+                    <Ionicons
+                      name={showPassword ? "eye-off-outline" : "eye-outline"}
+                      size={20}
+                      color="#9CA3AF"
                     />
                   </TouchableOpacity>
                 </View>
@@ -200,13 +212,18 @@ export function ChangePasswordModal({
                   style={[
                     styles.inputWrapper,
                     {
-                      backgroundColor: "#ffffff",
                       borderColor: errors.confirmPassword
                         ? colors.error
-                        : colors.border,
+                        : "#E5E7EB",
                     },
                   ]}
                 >
+                  <Ionicons
+                    name="lock-closed-outline"
+                    size={20}
+                    color="#9CA3AF"
+                    style={styles.inputIcon}
+                  />
                   <TextInput
                     style={[styles.input, { color: colors.primaryText }]}
                     value={confirmPassword}
@@ -216,8 +233,8 @@ export function ChangePasswordModal({
                         setErrors({ ...errors, confirmPassword: undefined });
                       }
                     }}
-                    placeholder="Confirme sua nova senha"
-                    placeholderTextColor={colors.disabledText}
+                    placeholder="Confirme sua senha"
+                    placeholderTextColor="#9CA3AF"
                     secureTextEntry={!showConfirmPassword}
                     autoCapitalize="none"
                     editable={!loading}
@@ -227,10 +244,12 @@ export function ChangePasswordModal({
                     style={styles.eyeButton}
                     activeOpacity={0.7}
                   >
-                    <IconSymbol
-                      name={showConfirmPassword ? "eye.slash.fill" : "eye.fill"}
-                      size={22}
-                      color={colors.primary}
+                    <Ionicons
+                      name={
+                        showConfirmPassword ? "eye-off-outline" : "eye-outline"
+                      }
+                      size={20}
+                      color="#9CA3AF"
                     />
                   </TouchableOpacity>
                 </View>
@@ -264,7 +283,7 @@ export function ChangePasswordModal({
                   <IconSymbol
                     name="checkmark.circle.fill"
                     size={20}
-                    color="#ffffff"
+                    color="#9CA3AF"
                   />
                   <Text style={styles.buttonText}>Alterar Senha</Text>
                 </>
@@ -349,20 +368,21 @@ const styles = StyleSheet.create({
   inputWrapper: {
     flexDirection: "row",
     alignItems: "center",
+    backgroundColor: "#ffffff",
     borderWidth: 1,
     borderRadius: BorderRadius.md,
     paddingHorizontal: Spacing.md,
+    paddingVertical: Spacing.sm,
     minHeight: 48,
   },
   input: {
     flex: 1,
     fontSize: FontSizes.md,
-    paddingVertical: Spacing.sm,
+    marginLeft: Spacing.xs,
   },
   eyeButton: {
     padding: Spacing.xs,
     marginLeft: Spacing.xs,
-    minWidth: 32,
     alignItems: "center",
     justifyContent: "center",
   },
@@ -389,5 +409,8 @@ const styles = StyleSheet.create({
     fontSize: FontSizes.md,
     fontWeight: FontWeights.bold,
     color: "#ffffff",
+  },
+  inputIcon: {
+    marginRight: Spacing.sm,
   },
 });

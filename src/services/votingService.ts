@@ -78,4 +78,17 @@ export const votingService = {
     );
     return data.id;
   },
+
+  /**
+   * Lista votos já confirmados por projeto e sessão
+   */
+  async listConfirmedVotesByProjetoAndSessao(
+    projetoId: string,
+    sessaoId: string
+  ): Promise<VotosPorSessaoProjeto> {
+    const { data } = await api.get<VotosPorSessaoProjeto>(
+      `/SessaoProjeto/read-by-sessao-projeto-with-votos-confirmados?projetoId=${projetoId}&sessaoId=${sessaoId}`
+    );
+    return data;
+  },
 };

@@ -122,12 +122,6 @@ export default function HomeScreen() {
               iconName="checkmark.square.fill"
               onPress={handleConfirmVotesPress}
             />
-            <ActionCard
-              title="Resultado Final"
-              subtitle="Visualizar resultado da votação"
-              iconName="chart.bar.fill"
-              onPress={handleFinalResultsPress}
-            />
           </>
         )}
       </ScrollView>

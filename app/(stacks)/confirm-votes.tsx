@@ -1,4 +1,5 @@
 import { ConfirmationModal } from "@/components/common/ConfirmationModal";
+import { EmptyState } from "@/components/common/EmptyState";
 import { Spinner } from "@/components/common/Spinner";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import {
@@ -17,12 +18,14 @@ import {
   votingService,
 } from "@/services/votingService";
 import { formatDate } from "@/utils/formatters";
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import {
   Alert,
-  FlatList,
   Modal,
   RefreshControl,
+  SectionBase,
+  SectionList,
+  SectionListRenderItemInfo,
   StyleSheet,
   Text,
   TouchableOpacity,
@@ -36,6 +39,8 @@ export default function ConfirmVotesScreen() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [data, setData] = useState<VotosPorSessaoProjeto | null>(null);
+  const [confirmedData, setConfirmedData] =
+    useState<VotosPorSessaoProjeto | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [project, setProject] = useState<Project | null>(null);
 
@@ -58,19 +63,27 @@ export default function ConfirmVotesScreen() {
     }
   }, [sessaoProjetoId]);
 
-  const loadVereadoresData = async () => {
-    if (!sessaoProjetoId) {
-      setLoading(false);
-      return;
-    }
-
+  const fetchVotesData = async (
+    sessaoProjetoIdParam: string,
+    projectParam: Project,
+    sessionIdParam: string
+  ) => {
     try {
       setLoading(true);
       setError(null);
-      const response = await votingService.listVereadoresByVotosInSessaoProjeto(
-        sessaoProjetoId
-      );
-      setData(response);
+
+      const [pendingResponse, confirmedResponse] = await Promise.all([
+        votingService.listVereadoresByVotosInSessaoProjeto(
+          sessaoProjetoIdParam
+        ),
+        votingService.listConfirmedVotesByProjetoAndSessao(
+          projectParam.id,
+          sessionIdParam
+        ),
+      ]);
+
+      setData(pendingResponse);
+      setConfirmedData(confirmedResponse);
     } catch (err: any) {
       console.error("Erro ao carregar dados dos vereadores:", err);
       setError(err.message || "Erro ao carregar dados");
@@ -79,16 +92,38 @@ export default function ConfirmVotesScreen() {
     }
   };
 
-  const loadProject = async (): Promise<string | null> => {
-    if (!activeSession?.id) return null;
+  const loadVereadoresData = async () => {
+    if (!sessaoProjetoId || !project || !activeSession?.id) {
+      if (!sessaoProjetoId) {
+        setLoading(false);
+      }
+      return;
+    }
+
+    await fetchVotesData(sessaoProjetoId, project, activeSession.id);
+  };
+
+  const loadProject = async (): Promise<{
+    project: Project | null;
+    sessaoProjetoId: string | null;
+  }> => {
+    if (!activeSession?.id) {
+      setProject(null);
+      setSessaoProjetoId(null);
+      setData(null);
+      setConfirmedData(null);
+      setLoading(false);
+      return { project: null, sessaoProjetoId: null };
+    }
 
     try {
       const projects = await projectsService.getBySession(activeSession.id);
       // Busca o projeto em votação
-      const projectInVoting = projects.find((p) => p.status === "EmVotacao");
-      if (projectInVoting) {
-        setProject(projectInVoting);
+      const projectInVoting =
+        projects.find((p) => p.status === "EmVotacao") || null;
+      setProject(projectInVoting);
 
+      if (projectInVoting) {
         // Busca o sessaoProjetoId
         try {
           const sessaoProjetoIdResult = await votingService.getSessaoProjetoId(
@@ -96,37 +131,96 @@ export default function ConfirmVotesScreen() {
             activeSession.id
           );
           setSessaoProjetoId(sessaoProjetoIdResult);
-          return sessaoProjetoIdResult;
+          return {
+            project: projectInVoting,
+            sessaoProjetoId: sessaoProjetoIdResult,
+          };
         } catch (error) {
           console.error("Erro ao buscar sessaoProjetoId:", error);
           setSessaoProjetoId(null);
-          return null;
+          setData(null);
+          setConfirmedData(null);
+          setLoading(false);
+          return { project: projectInVoting, sessaoProjetoId: null };
         }
-      } else {
-        setProject(null);
-        setSessaoProjetoId(null);
-        return null;
       }
+
+      setSessaoProjetoId(null);
+      setData(null);
+      setConfirmedData(null);
+      setLoading(false);
+      return { project: null, sessaoProjetoId: null };
     } catch (error) {
       console.error("Erro ao carregar projeto:", error);
       setSessaoProjetoId(null);
-      return null;
+      setProject(null);
+      setData(null);
+      setConfirmedData(null);
+      setLoading(false);
+      return { project: null, sessaoProjetoId: null };
     }
   };
 
   const handleRefresh = async () => {
-    setRefreshing(true);
-    // Primeiro carrega o projeto (que busca o sessaoProjetoId)
-    const sessaoProjetoIdResult = await loadProject();
-    // Depois carrega os dados dos vereadores usando o sessaoProjetoId retornado
-    if (sessaoProjetoIdResult) {
-      const response = await votingService.listVereadoresByVotosInSessaoProjeto(
-        sessaoProjetoIdResult
-      );
-      setData(response);
+    try {
+      setRefreshing(true);
+      const {
+        project: refreshedProject,
+        sessaoProjetoId: refreshedSessaoProjetoId,
+      } = await loadProject();
+
+      if (refreshedProject && refreshedSessaoProjetoId && activeSession?.id) {
+        await fetchVotesData(
+          refreshedSessaoProjetoId,
+          refreshedProject,
+          activeSession.id
+        );
+      }
+    } finally {
+      setRefreshing(false);
     }
-    setRefreshing(false);
   };
+
+  const confirmedVotes = useMemo(
+    () => confirmedData?.votos ?? [],
+    [confirmedData]
+  );
+
+  const confirmedVoteIds = useMemo(() => {
+    return new Set(confirmedVotes.map((vote) => vote.id));
+  }, [confirmedVotes]);
+
+  const pendingVotes = useMemo(() => {
+    if (!data?.votos) {
+      return [];
+    }
+
+    return data.votos.filter(
+      (vote) => !vote.votoConfirmado && !confirmedVoteIds.has(vote.id)
+    );
+  }, [data, confirmedVoteIds]);
+
+  type VoteSection = SectionBase<Voto> & {
+    keyType: "pending" | "confirmed";
+    title: string;
+  };
+
+  const sections: VoteSection[] = useMemo(() => {
+    return [
+      {
+        key: "pending",
+        keyType: "pending",
+        title: "Votos para confirmar",
+        data: pendingVotes,
+      },
+      {
+        key: "confirmed",
+        keyType: "confirmed",
+        title: "Votos confirmados",
+        data: confirmedVotes,
+      },
+    ];
+  }, [pendingVotes, confirmedVotes]);
 
   const handleAcceptAllVotes = () => {
     setAcceptAllModal(true);
@@ -182,7 +276,8 @@ export default function ConfirmVotesScreen() {
         "Aprovado"
       );
       Alert.alert("Sucesso", "Projeto marcado como aprovado!");
-      await Promise.all([loadProject(), loadVereadoresData()]);
+      await loadProject();
+      await loadVereadoresData();
     } catch (error: any) {
       Alert.alert("Erro", error.message || "Erro ao aprovar o projeto");
     } finally {
@@ -202,7 +297,8 @@ export default function ConfirmVotesScreen() {
         "Rejeitado"
       );
       Alert.alert("Sucesso", "Projeto marcado como rejeitado!");
-      await Promise.all([loadProject(), loadVereadoresData()]);
+      await loadProject();
+      await loadVereadoresData();
     } catch (error: any) {
       Alert.alert("Erro", error.message || "Erro ao rejeitar o projeto");
     } finally {
@@ -247,15 +343,95 @@ export default function ConfirmVotesScreen() {
     }
   };
 
-  const renderVoteItem = ({ item: voto }: { item: Voto }) => (
+  const renderVoteItem = ({ item: voto }: { item: Voto }) => {
+    console.log("renderVoteItem - voto", voto);
+
+    return (
+      <View
+        style={[
+          styles.voteCard,
+          {
+            backgroundColor: "#ffffff",
+            borderColor: colors.border,
+            borderLeftWidth: voto.votoConfirmado ? 4 : 1,
+            borderLeftColor: voto.votoConfirmado
+              ? colors.success
+              : colors.border,
+          },
+        ]}
+      >
+        <View style={styles.voteCardContent}>
+          <View style={styles.voteInfo}>
+            <Text style={[styles.vereadorName, { color: colors.primaryText }]}>
+              {voto.vereadorVotante.nome}
+            </Text>
+            <View style={styles.voteDetails}>
+              <View
+                style={[
+                  styles.voteBadge,
+                  {
+                    backgroundColor: "transparent",
+                    borderWidth: 1,
+                    borderColor: getVoteColor(voto.valor),
+                  },
+                ]}
+              >
+                <Text
+                  style={[
+                    styles.voteBadgeLabel,
+                    { color: colors.secondaryText },
+                  ]}
+                >
+                  Voto:
+                </Text>
+                <Text
+                  style={[
+                    styles.voteBadgeValue,
+                    { color: getVoteColor(voto.valor) },
+                  ]}
+                >
+                  {getVoteLabel(voto.valor)}
+                </Text>
+              </View>
+              <Text style={[styles.voteTime, { color: colors.secondaryText }]}>
+                {formatVoteDate(voto.dataHora)}
+              </Text>
+            </View>
+          </View>
+          <View style={styles.voteActions}>
+            <TouchableOpacity
+              style={[
+                styles.actionButton,
+                styles.acceptButton,
+                {
+                  backgroundColor: voto.votoConfirmado
+                    ? colors.inactive
+                    : colors.success,
+                },
+              ]}
+              onPress={() => handleAcceptVote(voto)}
+              disabled={voto.votoConfirmado}
+              activeOpacity={0.8}
+            >
+              <Text style={styles.actionButtonText}>
+                {voto.votoConfirmado ? "Aceito" : "Aceitar"}
+              </Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </View>
+    );
+  };
+
+  const renderConfirmedVoteItem = ({ item: voto }: { item: Voto }) => (
     <View
       style={[
         styles.voteCard,
         {
           backgroundColor: "#ffffff",
           borderColor: colors.border,
-          borderLeftWidth: voto.votoConfirmado ? 4 : 1,
-          borderLeftColor: voto.votoConfirmado ? colors.success : colors.border,
+          borderLeftWidth: 4,
+          borderLeftColor: colors.success,
         },
       ]}
     >
@@ -269,9 +445,9 @@ export default function ConfirmVotesScreen() {
               style={[
                 styles.voteBadge,
                 {
-                  backgroundColor: "transparent",
+                  backgroundColor: colors.success + "15",
                   borderWidth: 1,
-                  borderColor: getVoteColor(voto.valor),
+                  borderColor: colors.success,
                 },
               ]}
             >
@@ -280,43 +456,107 @@ export default function ConfirmVotesScreen() {
               >
                 Voto:
               </Text>
-              <Text
-                style={[
-                  styles.voteBadgeValue,
-                  { color: getVoteColor(voto.valor) },
-                ]}
-              >
+              <Text style={[styles.voteBadgeValue, { color: colors.success }]}>
                 {getVoteLabel(voto.valor)}
               </Text>
             </View>
             <Text style={[styles.voteTime, { color: colors.secondaryText }]}>
-              {formatVoteDate(voto.dataHora)}
+              Confirmado em {formatVoteDate(voto.dataHora)}
             </Text>
           </View>
         </View>
-        <View style={styles.voteActions}>
-          <TouchableOpacity
-            style={[
-              styles.actionButton,
-              styles.acceptButton,
-              {
-                backgroundColor: voto.votoConfirmado
-                  ? colors.inactive
-                  : colors.success,
-              },
-            ]}
-            onPress={() => handleAcceptVote(voto)}
-            disabled={voto.votoConfirmado}
-            activeOpacity={0.8}
-          >
-            <Text style={styles.actionButtonText}>
-              {voto.votoConfirmado ? "Aceito" : "Aceitar"}
-            </Text>
-          </TouchableOpacity>
+        <View
+          style={[
+            styles.confirmedIcon,
+            { backgroundColor: colors.success + "15" },
+          ]}
+        >
+          <IconSymbol
+            name="checkmark.seal.fill"
+            size={24}
+            color={colors.success}
+          />
         </View>
       </View>
     </View>
   );
+
+  const renderSectionHeader = ({ section }: { section: VoteSection }) => {
+    const count = section.data.length;
+    const subtitle =
+      section.keyType === "pending"
+        ? `${count} voto(s) pendentes`
+        : `${count} voto(s) confirmados`;
+
+    const containerStyles = [
+      styles.sectionHeader,
+      section.keyType === "pending"
+        ? styles.sectionHeaderFirst
+        : styles.sectionHeaderNext,
+    ];
+
+    return (
+      <View style={containerStyles}>
+        <View style={styles.sectionHeaderInfo}>
+          <Text style={[styles.sectionTitle, { color: colors.primaryText }]}>
+            {section.title}
+          </Text>
+          <Text
+            style={[styles.sectionSubtitle, { color: colors.secondaryText }]}
+          >
+            {subtitle}
+          </Text>
+        </View>
+        {section.keyType === "pending" && count > 0 && (
+          <TouchableOpacity
+            style={[
+              styles.sectionActionButton,
+              { backgroundColor: colors.success },
+            ]}
+            onPress={handleAcceptAllVotes}
+            activeOpacity={0.8}
+          >
+            <IconSymbol name="checkmark.circle" size={18} color="#ffffff" />
+            <Text style={styles.sectionActionButtonText}>Aceitar Todos</Text>
+          </TouchableOpacity>
+        )}
+      </View>
+    );
+  };
+
+  const renderSectionFooter = ({ section }: { section: VoteSection }) => {
+    if (loading) {
+      return null;
+    }
+
+    if (section.data.length > 0) {
+      return null;
+    }
+
+    const message =
+      section.keyType === "pending"
+        ? "Nenhum voto pendente"
+        : "Nenhum voto confirmado";
+
+    return (
+      <View style={styles.sectionFooter}>
+        <Text style={[styles.emptyText, { color: colors.secondaryText }]}>
+          {message}
+        </Text>
+      </View>
+    );
+  };
+
+  const renderSectionItem = ({
+    item,
+    section,
+  }: SectionListRenderItemInfo<Voto, VoteSection>) => {
+    if (section.keyType === "pending") {
+      return renderVoteItem({ item });
+    }
+
+    return renderConfirmedVoteItem({ item });
+  };
 
   const renderProjectCard = () => {
     if (!project) return null;
@@ -441,35 +681,17 @@ export default function ConfirmVotesScreen() {
             </View>
           </View>
         </View>
-
-        {/* Botão Aceitar Todos - apenas se houver votos pendentes */}
-        {data &&
-          data.votos.length > 0 &&
-          data.votos.some((voto) => !voto.votoConfirmado) && (
-            <View style={styles.topButtonContainer}>
-              <TouchableOpacity
-                style={[
-                  styles.topActionButton,
-                  styles.acceptAllButton,
-                  { backgroundColor: colors.success },
-                ]}
-                onPress={handleAcceptAllVotes}
-                activeOpacity={0.8}
-              >
-                <IconSymbol name="checkmark.circle" size={20} color="#ffffff" />
-                <Text style={styles.topActionButtonText}>Aceitar Todos</Text>
-              </TouchableOpacity>
-            </View>
-          )}
       </>
     );
   };
 
   const renderFooter = () => {
-    if (!data || data.votos.length === 0) return null;
+    if (!data) return null;
 
-    // Botão Finalizar Votação no footer se não houver mais votos
-    if (data.votos.every((voto) => voto.votoConfirmado)) {
+    if (
+      pendingVotes.length === 0 &&
+      (confirmedVotes.length > 0 || data.votos.length > 0)
+    ) {
       return (
         <View style={styles.footer}>
           <TouchableOpacity
@@ -488,22 +710,11 @@ export default function ConfirmVotesScreen() {
       );
     }
 
-    return <View style={styles.footer} />;
-  };
-
-  const renderEmpty = () => {
-    if (loading) {
-      return (
-        <View style={styles.loadingContainer}>
-          <Spinner />
-        </View>
-      );
+    if (pendingVotes.length > 0) {
+      return <View style={styles.footer} />;
     }
-    return (
-      <Text style={[styles.emptyText, { color: colors.secondaryText }]}>
-        Nenhum voto encontrado
-      </Text>
-    );
+
+    return null;
   };
 
   if (loading && !data) {
@@ -537,15 +748,30 @@ export default function ConfirmVotesScreen() {
     );
   }
 
+  if (!project) {
+    return (
+      <View
+        style={[styles.emptyContainer, { backgroundColor: colors.background }]}
+      >
+        <EmptyState
+          icon="checkmark.square.fill"
+          title="Nenhum projeto para confirmar"
+          message="Não há projetos aguardando confirmação de votos no momento. Aguarde até que novos votos sejam enviados para revisão."
+        />
+      </View>
+    );
+  }
+
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
-      <FlatList
-        data={data?.votos || []}
-        renderItem={renderVoteItem}
+      <SectionList<Voto, VoteSection>
+        sections={sections}
+        renderItem={renderSectionItem}
         keyExtractor={(item) => item.id}
         ListHeaderComponent={renderHeader}
         ListFooterComponent={renderFooter}
-        ListEmptyComponent={renderEmpty}
+        renderSectionHeader={renderSectionHeader}
+        renderSectionFooter={renderSectionFooter}
         contentContainerStyle={styles.contentContainer}
         showsVerticalScrollIndicator={false}
         refreshControl={
@@ -556,7 +782,7 @@ export default function ConfirmVotesScreen() {
             tintColor={colors.primary}
           />
         }
-        onEndReachedThreshold={0.3}
+        stickySectionHeadersEnabled={false}
       />
 
       {/* Modal de confirmar aceitar todos */}
@@ -603,25 +829,11 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
   },
-  topButtonContainer: {
-    paddingBottom: Spacing.md,
-  },
-  topActionButton: {
-    width: "100%",
-    flexDirection: "row",
-    alignItems: "center",
+  emptyContainer: {
+    flex: 1,
     justifyContent: "center",
-    padding: Spacing.md,
-    borderRadius: BorderRadius.md,
-    gap: Spacing.sm,
-  },
-  acceptAllButton: {
-    // Estilo será aplicado dinamicamente
-  },
-  topActionButtonText: {
-    fontSize: FontSizes.sm,
-    fontWeight: FontWeights.semibold,
-    color: "#ffffff",
+    alignItems: "center",
+    padding: Spacing.lg,
   },
   contentContainer: {
     padding: Spacing.md,
@@ -629,6 +841,48 @@ const styles = StyleSheet.create({
   },
   summaryContainer: {
     marginBottom: Spacing.md,
+  },
+  sectionHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingHorizontal: Spacing.md,
+    paddingVertical: Spacing.sm,
+  },
+  sectionHeaderFirst: {
+    marginTop: Spacing.lg,
+  },
+  sectionHeaderNext: {
+    marginTop: Spacing.lg,
+  },
+  sectionHeaderInfo: {
+    flex: 1,
+    gap: Spacing.xs,
+  },
+  sectionTitle: {
+    fontSize: FontSizes.lg,
+    fontWeight: FontWeights.bold,
+  },
+  sectionSubtitle: {
+    fontSize: FontSizes.sm,
+  },
+  sectionActionButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    paddingVertical: Spacing.sm,
+    paddingHorizontal: Spacing.md,
+    borderRadius: BorderRadius.md,
+    gap: Spacing.sm,
+  },
+  sectionActionButtonText: {
+    fontSize: FontSizes.sm,
+    fontWeight: FontWeights.semibold,
+    color: "#ffffff",
+  },
+  sectionFooter: {
+    paddingHorizontal: Spacing.md,
+    paddingBottom: Spacing.md,
   },
   summaryCard: {
     padding: Spacing.lg,
@@ -745,6 +999,13 @@ const styles = StyleSheet.create({
     fontWeight: FontWeights.semibold,
     color: "#ffffff",
     textAlign: "center",
+  },
+  confirmedIcon: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    alignItems: "center",
+    justifyContent: "center",
   },
   card: {
     padding: Spacing.md,

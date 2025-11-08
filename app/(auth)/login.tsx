@@ -20,13 +20,15 @@ import {
   Spacing,
 } from "@/constants/theme";
 import { useAuth } from "@/contexts/AuthContext";
+import { ChangePasswordModal } from "@/components/common/ChangePasswordModal";
 
 export default function LoginScreen() {
-  const { signIn, loading } = useAuth();
+  const { signIn, loading, changePassword } = useAuth();
 
   const [userName, setUserName] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
+  const [showChangePasswordModal, setShowChangePasswordModal] = useState(false);
 
   const handleLogin = async () => {
     if (!userName.trim() || !password.trim()) {
@@ -34,7 +36,13 @@ export default function LoginScreen() {
       return;
     }
     try {
-      await signIn(userName, password);
+      const { passwordReseted } = await signIn(userName, password);
+
+      if (passwordReseted) {
+        setShowChangePasswordModal(true);
+        return;
+      }
+
       router.replace("/(tabs)");
     } catch (error: any) {
       Alert.alert("Erro no Login", error.message || "Erro ao fazer login");
@@ -154,6 +162,15 @@ export default function LoginScreen() {
           </Text>
         </View>
       </ScrollView>
+      <ChangePasswordModal
+        visible={showChangePasswordModal}
+        onSuccess={() => {
+          setShowChangePasswordModal(false);
+          setPassword("");
+          setShowPassword(false);
+        }}
+        onChangePassword={changePassword}
+      />
     </KeyboardAvoidingView>
   );
 }
