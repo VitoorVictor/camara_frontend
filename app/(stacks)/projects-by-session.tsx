@@ -76,14 +76,20 @@ export default function ProjectsBySessionScreen() {
 
   const getStatusBadgeColor = (status: string) => {
     switch (status) {
-      case "Aprovado":
-        return colors.success;
-      case "Rejeitado":
-        return colors.error;
-      case "EmVotacao":
-        return colors.warning;
       case "Apresentado":
         return colors.primary;
+      case "Agendado":
+        return colors.info;
+      case "EmVotacao":
+        return colors.warning;
+      case "AprovadoParcial":
+        return colors.warning;
+      case "AprovadoParcialAgendado":
+        return colors.info;
+      case "Aprovado":
+        return colors.success;
+      case "Reprovado":
+        return colors.error;
       case "Cancelado":
         return colors.inactive;
       default:
@@ -92,14 +98,20 @@ export default function ProjectsBySessionScreen() {
   };
   const getProjetoStatusLabel = (status: string) => {
     switch (status) {
-      case "Aprovado":
-        return "Aprovado";
-      case "Rejeitado":
-        return "Rejeitado";
-      case "EmVotacao":
-        return "Em Votação";
       case "Apresentado":
         return "Apresentado";
+      case "Agendado":
+        return "Agendado";
+      case "EmVotacao":
+        return "Em Votação";
+      case "AprovadoParcial":
+        return "Aprovado Parcial";
+      case "AprovadoParcialAgendado":
+        return "Aprovado Parcial Agendado";
+      case "Aprovado":
+        return "Aprovado";
+      case "Reprovado":
+        return "Reprovado";
       case "Cancelado":
         return "Cancelado";
       default:
