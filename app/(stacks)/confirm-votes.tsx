@@ -11,6 +11,7 @@ import {
 } from "@/constants/theme";
 import { useSession } from "@/contexts/SessionContext";
 import { useColorScheme } from "@/hooks/use-color-scheme";
+import { STORAGE_KEYS } from "@/services/api";
 import { Project, projectsService } from "@/services/projectsService";
 import {
   Voto,
@@ -19,8 +20,20 @@ import {
 } from "@/services/votingService";
 import { useAuth } from "@/src/contexts/AuthContext";
 import { formatDate } from "@/utils/formatters";
+import {
+  HubConnection,
+  HubConnectionBuilder,
+  LogLevel,
+} from "@microsoft/signalr";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { router } from "expo-router";
-import React, { useEffect, useMemo, useState } from "react";
+import React, {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import {
   Alert,
   Modal,
@@ -56,57 +69,11 @@ export default function ConfirmVotesScreen() {
   const [updatingProjectStatus, setUpdatingProjectStatus] = useState(false);
   const [sessaoProjetoId, setSessaoProjetoId] = useState<string | null>(null);
 
-  useEffect(() => {
-    loadProject();
-  }, [activeSession?.id]);
+  // SignalR - conexão simples
+  const signalRConnection = useRef<HubConnection | null>(null);
+  const [signalRStatus, setSignalRStatus] = useState<string>("Desconectado");
 
-  useEffect(() => {
-    if (sessaoProjetoId) {
-      loadVereadoresData();
-    }
-  }, [sessaoProjetoId]);
-
-  const fetchVotesData = async (
-    sessaoProjetoIdParam: string,
-    projectParam: Project,
-    sessionIdParam: string
-  ) => {
-    try {
-      setLoading(true);
-      setError(null);
-
-      const [pendingResponse, confirmedResponse] = await Promise.all([
-        votingService.listVereadoresByVotosInSessaoProjeto(
-          sessaoProjetoIdParam
-        ),
-        votingService.listConfirmedVotesByProjetoAndSessao(
-          projectParam.id,
-          sessionIdParam
-        ),
-      ]);
-
-      setData(pendingResponse);
-      setConfirmedData(confirmedResponse);
-    } catch (err: any) {
-      console.error("Erro ao carregar dados dos vereadores:", err);
-      setError(err.message || "Erro ao carregar dados");
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const loadVereadoresData = async () => {
-    if (!sessaoProjetoId || !project || !activeSession?.id) {
-      if (!sessaoProjetoId) {
-        setLoading(false);
-      }
-      return;
-    }
-
-    await fetchVotesData(sessaoProjetoId, project, activeSession.id);
-  };
-
-  const loadProject = async (): Promise<{
+  const loadProject = useCallback(async (): Promise<{
     project: Project | null;
     sessaoProjetoId: string | null;
   }> => {
@@ -162,6 +129,311 @@ export default function ConfirmVotesScreen() {
       setLoading(false);
       return { project: null, sessaoProjetoId: null };
     }
+  }, [activeSession?.id]);
+
+  const fetchVotesData = useCallback(
+    async (
+      sessaoProjetoIdParam: string,
+      projectParam: Project,
+      sessionIdParam: string,
+      silent = false
+    ) => {
+      try {
+        if (!silent) {
+          setLoading(true);
+        }
+        setError(null);
+
+        const [pendingResponse, confirmedResponse] = await Promise.all([
+          votingService.listVereadoresByVotosInSessaoProjeto(
+            sessaoProjetoIdParam
+          ),
+          votingService.listConfirmedVotesByProjetoAndSessao(
+            projectParam.id,
+            sessionIdParam
+          ),
+        ]);
+
+        setData(pendingResponse);
+        setConfirmedData(confirmedResponse);
+      } catch (err: any) {
+        console.error("Erro ao carregar dados dos vereadores:", err);
+        setError(err.message || "Erro ao carregar dados");
+      } finally {
+        if (!silent) {
+          setLoading(false);
+        }
+      }
+    },
+    []
+  );
+
+  useEffect(() => {
+    loadProject();
+  }, [loadProject]);
+
+  useEffect(() => {
+    if (sessaoProjetoId) {
+      loadVereadoresData();
+    }
+  }, [sessaoProjetoId]);
+
+  // Refs para dados atuais (evita dependências no useEffect)
+  const currentSessaoProjetoIdRef = useRef(sessaoProjetoId);
+  const currentProjectRef = useRef(project);
+  const currentActiveSessionRef = useRef(activeSession);
+  const fetchVotesDataRef = useRef(fetchVotesData);
+  const loadProjectRef = useRef(loadProject);
+
+  // Atualiza refs quando valores mudam
+  useEffect(() => {
+    currentSessaoProjetoIdRef.current = sessaoProjetoId;
+    currentProjectRef.current = project;
+    currentActiveSessionRef.current = activeSession;
+    fetchVotesDataRef.current = fetchVotesData;
+    loadProjectRef.current = loadProject;
+  }, [sessaoProjetoId, project, activeSession, fetchVotesData, loadProject]);
+
+  // SignalR - Conecta quando há sessão ativa (implementação simples)
+  useEffect(() => {
+    let isMounted = true;
+
+    const iniciarSignalR = async () => {
+      const sessaoId = activeSession?.id;
+      const sessaoStatus = activeSession?.status;
+
+      // Só conecta se houver sessão ativa e status "EmAndamento"
+      if (!sessaoId || sessaoStatus !== "EmAndamento") {
+        // Desconecta se não há sessão válida
+        if (signalRConnection.current) {
+          try {
+            await signalRConnection.current.stop();
+          } catch (err) {
+            console.error("Erro ao desconectar SignalR:", err);
+          }
+          if (isMounted) {
+            signalRConnection.current = null;
+            setSignalRStatus("Desconectado");
+          }
+        }
+        return;
+      }
+
+      // Se já está conectado e conectado, não conecta novamente
+      if (signalRConnection.current) {
+        const connectionState = signalRConnection.current.state;
+        if (connectionState === "Connected") {
+          console.log("✅ SignalR já está conectado");
+          if (isMounted) {
+            setSignalRStatus("Conectado");
+          }
+          return;
+        }
+        // Se não está conectado, limpa a conexão anterior
+        try {
+          await signalRConnection.current.stop();
+        } catch (err) {
+          console.error("Erro ao parar conexão anterior:", err);
+        }
+        signalRConnection.current = null;
+      }
+
+      try {
+        // Cria conexão SignalR com reconexão automática customizada
+        const conn = new HubConnectionBuilder()
+          .withUrl("http://192.168.3.12:5097/hubs/sessao", {
+            accessTokenFactory: async () => {
+              const currentToken = await AsyncStorage.getItem(
+                STORAGE_KEYS.ACCESS_TOKEN
+              );
+              return currentToken || "";
+            },
+          })
+          .configureLogging(LogLevel.Information)
+          .withAutomaticReconnect({
+            // Intervalos de reconexão (em milissegundos)
+            // Tenta reconectar imediatamente, depois 2s, 10s, 30s, e então a cada 30s
+            nextRetryDelayInMilliseconds: (retryContext) => {
+              if (retryContext.previousRetryCount === 0) return 0; // Primeira tentativa: imediato
+              if (retryContext.previousRetryCount === 1) return 2000; // Segunda: 2 segundos
+              if (retryContext.previousRetryCount === 2) return 10000; // Terceira: 10 segundos
+              return 30000; // Demais: 30 segundos
+            },
+          })
+          .build();
+
+        // Handlers dos eventos (usam refs para acessar valores atuais)
+        conn.on("VotacaoAberta", (dados) => {
+          console.log("📢 VotacaoAberta:", dados);
+          // Atualiza os dados quando votação é aberta
+          const currentSessaoProjetoId = currentSessaoProjetoIdRef.current;
+          const currentProject = currentProjectRef.current;
+          const currentActiveSession = currentActiveSessionRef.current;
+          const fetchVotes = fetchVotesDataRef.current;
+
+          if (
+            currentSessaoProjetoId &&
+            currentProject &&
+            currentActiveSession?.id
+          ) {
+            fetchVotes(
+              currentSessaoProjetoId,
+              currentProject,
+              currentActiveSession.id,
+              true
+            );
+          }
+        });
+
+        conn.on("VotacaoEncerrada", (dados) => {
+          console.log("📕 VotacaoEncerrada:", dados);
+          // Recarrega projeto quando votação é encerrada
+          const currentActiveSession = currentActiveSessionRef.current;
+          const loadProj = loadProjectRef.current;
+          const fetchVotes = fetchVotesDataRef.current;
+
+          if (currentActiveSession?.id) {
+            loadProj().then(
+              ({
+                project: reloadedProject,
+                sessaoProjetoId: reloadedSessaoProjetoId,
+              }) => {
+                if (
+                  reloadedSessaoProjetoId &&
+                  reloadedProject &&
+                  currentActiveSession?.id
+                ) {
+                  fetchVotes(
+                    reloadedSessaoProjetoId,
+                    reloadedProject,
+                    currentActiveSession.id,
+                    true
+                  );
+                }
+              }
+            );
+          }
+        });
+
+        conn.on("VotosConfirmados", (dados) => {
+          console.log("✅ VotosConfirmados:", dados);
+          // Atualiza os dados quando votos são confirmados
+          const currentSessaoProjetoId = currentSessaoProjetoIdRef.current;
+          const currentProject = currentProjectRef.current;
+          const currentActiveSession = currentActiveSessionRef.current;
+          const fetchVotes = fetchVotesDataRef.current;
+
+          if (
+            currentSessaoProjetoId &&
+            currentProject &&
+            currentActiveSession?.id
+          ) {
+            fetchVotes(
+              currentSessaoProjetoId,
+              currentProject,
+              currentActiveSession.id,
+              true
+            );
+          }
+        });
+
+        // ✅ Handlers para eventos de reconexão
+        conn.onreconnecting((error) => {
+          console.warn("🟡 SignalR reconectando...", error);
+          if (isMounted) {
+            setSignalRStatus("Reconectando...");
+          }
+        });
+
+        conn.onreconnected(async (connectionId) => {
+          console.log("🟢 SignalR reconectado! ConnectionId:", connectionId);
+          if (isMounted) {
+            setSignalRStatus("Conectado");
+
+            // Reentra no grupo da sessão após reconectar (usa ref para valor atual)
+            const currentActiveSession = currentActiveSessionRef.current;
+            const currentSessaoId = currentActiveSession?.id;
+            if (currentSessaoId) {
+              try {
+                await conn.invoke("JoinSessaoGroup", currentSessaoId);
+                console.log("👥 Reentrou no grupo da sessão", currentSessaoId);
+              } catch (err) {
+                console.error("❌ Erro ao reentrar no grupo:", err);
+              }
+            }
+          }
+        });
+
+        conn.onclose((error) => {
+          console.warn("🔴 SignalR desconectado.", error);
+          if (isMounted) {
+            // Se a conexão foi fechada manualmente (signalRConnection.current é null),
+            // mostra status de desconectado
+            // Caso contrário, o SignalR vai tentar reconectar automaticamente
+            // e o status será atualizado para "Reconectando..." no onreconnecting
+            if (!signalRConnection.current) {
+              setSignalRStatus("Desconectado");
+            }
+            // Se signalRConnection.current ainda existe, significa que não foi fechado manualmente
+            // e o SignalR vai tentar reconectar automaticamente (onreconnecting será chamado)
+          }
+        });
+
+        // Conecta
+        await conn.start();
+        if (isMounted) {
+          setSignalRStatus("Conectado");
+          console.log("✅ Conectado ao SignalR");
+
+          // Entra no grupo da sessão
+          await conn.invoke("JoinSessaoGroup", sessaoId);
+          console.log("👥 Entrou no grupo da sessão", sessaoId);
+
+          signalRConnection.current = conn;
+        } else {
+          // Se o componente desmontou, desconecta
+          await conn.stop();
+        }
+      } catch (err) {
+        console.error("❌ Erro ao conectar SignalR:", err);
+        if (isMounted) {
+          setSignalRStatus("Erro");
+          signalRConnection.current = null;
+        }
+      }
+    };
+
+    iniciarSignalR();
+
+    // Cleanup - desconecta quando desmonta ou quando a sessão muda
+    return () => {
+      isMounted = false;
+      if (signalRConnection.current) {
+        signalRConnection.current
+          .stop()
+          .then(() => {
+            console.log("🔌 Desconectado do SignalR");
+            if (isMounted) {
+              signalRConnection.current = null;
+              setSignalRStatus("Desconectado");
+            }
+          })
+          .catch((err) => {
+            console.error("Erro ao desconectar SignalR:", err);
+          });
+      }
+    };
+  }, [activeSession?.id, activeSession?.status]);
+
+  const loadVereadoresData = async () => {
+    if (!sessaoProjetoId || !project || !activeSession?.id) {
+      if (!sessaoProjetoId) {
+        setLoading(false);
+      }
+      return;
+    }
+
+    await fetchVotesData(sessaoProjetoId, project, activeSession.id);
   };
 
   const handleRefresh = async () => {
@@ -300,7 +572,7 @@ export default function ConfirmVotesScreen() {
       await projectsService.updateStatus(
         activeSession.id,
         project.id,
-        "Rejeitado"
+        "Reprovado"
       );
       Alert.alert("Sucesso", "Projeto marcado como rejeitado!");
       await loadProject();
@@ -534,26 +806,68 @@ export default function ConfirmVotesScreen() {
   };
 
   const renderSectionFooter = ({ section }: { section: VoteSection }) => {
-    if (loading) {
+    if (loading || !data) {
       return null;
     }
 
-    if (section.data.length > 0) {
-      return null;
+    // Seção de votos pendentes
+    if (section.keyType === "pending") {
+      // Se há votos pendentes, não mostra nada no footer
+      if (section.data.length > 0) {
+        return null;
+      }
+
+      // Se não há mais votos pendentes E há votos confirmados ou votos no total
+      if (
+        pendingVotes.length === 0 &&
+        (confirmedVotes.length > 0 || data.votos.length > 0)
+      ) {
+        return (
+          <View style={styles.sectionFooter}>
+            <TouchableOpacity
+              style={[
+                styles.finishVotingButton,
+                { backgroundColor: colors.primary },
+              ]}
+              onPress={handleFinishVoting}
+              disabled={updatingProjectStatus}
+              activeOpacity={0.8}
+            >
+              <IconSymbol name="checkmark.circle" size={20} color="#ffffff" />
+              <Text style={styles.finishVotingButtonText}>
+                Finalizar Votação
+              </Text>
+            </TouchableOpacity>
+          </View>
+        );
+      }
+
+      // Se não há votos pendentes e também não há votos confirmados, mostra mensagem
+      return (
+        <View style={styles.sectionFooter}>
+          <Text style={[styles.emptyText, { color: colors.secondaryText }]}>
+            Nenhum voto pendente
+          </Text>
+        </View>
+      );
     }
 
-    const message =
-      section.keyType === "pending"
-        ? "Nenhum voto pendente"
-        : "Nenhum voto confirmado";
+    // Seção de votos confirmados
+    if (section.keyType === "confirmed") {
+      if (section.data.length > 0) {
+        return null;
+      }
 
-    return (
-      <View style={styles.sectionFooter}>
-        <Text style={[styles.emptyText, { color: colors.secondaryText }]}>
-          {message}
-        </Text>
-      </View>
-    );
+      return (
+        <View style={styles.sectionFooter}>
+          <Text style={[styles.emptyText, { color: colors.secondaryText }]}>
+            Nenhum voto confirmado
+          </Text>
+        </View>
+      );
+    }
+
+    return null;
   };
 
   const renderSectionItem = ({
@@ -617,6 +931,51 @@ export default function ConfirmVotesScreen() {
             {formatDate(project.criadoEm, false)}
           </Text>
         </View>
+        {/* Indicador de conexão SignalR */}
+        {activeSession?.id && (
+          <View style={styles.connectionStatus}>
+            <View
+              style={[
+                styles.connectionDot,
+                {
+                  backgroundColor:
+                    signalRStatus === "Conectado"
+                      ? colors.success
+                      : signalRStatus === "Reconectando..."
+                      ? colors.warning
+                      : signalRStatus === "Erro"
+                      ? colors.error
+                      : colors.warning,
+                },
+              ]}
+            />
+            <Text
+              style={[
+                styles.connectionText,
+                {
+                  color:
+                    signalRStatus === "Conectado"
+                      ? colors.success
+                      : signalRStatus === "Reconectando..."
+                      ? colors.warning
+                      : signalRStatus === "Erro"
+                      ? colors.error
+                      : colors.secondaryText,
+                },
+              ]}
+            >
+              {signalRStatus === "Conectado"
+                ? "Atualização em tempo real ativa"
+                : signalRStatus === "Reconectando..."
+                ? "Reconectando..."
+                : signalRStatus === "Erro"
+                ? "Erro na conexão"
+                : signalRStatus === "Desconectado"
+                ? "Desconectado"
+                : "Conectando..."}
+            </Text>
+          </View>
+        )}
       </View>
     );
   };
@@ -695,34 +1054,7 @@ export default function ConfirmVotesScreen() {
   };
 
   const renderFooter = () => {
-    if (!data) return null;
-
-    if (
-      pendingVotes.length === 0 &&
-      (confirmedVotes.length > 0 || data.votos.length > 0)
-    ) {
-      return (
-        <View style={styles.footer}>
-          <TouchableOpacity
-            style={[
-              styles.finishVotingButton,
-              { backgroundColor: colors.primary },
-            ]}
-            onPress={handleFinishVoting}
-            disabled={updatingProjectStatus}
-            activeOpacity={0.8}
-          >
-            <IconSymbol name="checkmark.circle" size={20} color="#ffffff" />
-            <Text style={styles.finishVotingButtonText}>Finalizar Votação</Text>
-          </TouchableOpacity>
-        </View>
-      );
-    }
-
-    if (pendingVotes.length > 0) {
-      return <View style={styles.footer} />;
-    }
-
+    // Footer vazio - o botão de finalizar está no footer da seção de votos pendentes
     return null;
   };
 
@@ -891,7 +1223,9 @@ const styles = StyleSheet.create({
   },
   sectionFooter: {
     paddingHorizontal: Spacing.md,
-    paddingBottom: Spacing.md,
+    paddingTop: Spacing.md,
+    paddingBottom: Spacing.lg,
+    gap: Spacing.md,
   },
   summaryCard: {
     padding: Spacing.lg,
@@ -1092,6 +1426,24 @@ const styles = StyleSheet.create({
   },
   projectDateText: {
     fontSize: FontSizes.xs,
+  },
+  connectionStatus: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginTop: Spacing.sm,
+    paddingTop: Spacing.sm,
+    borderTopWidth: 1,
+    borderColor: "rgba(0, 0, 0, 0.1)",
+    gap: Spacing.xs,
+  },
+  connectionDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+  },
+  connectionText: {
+    fontSize: FontSizes.xs,
+    fontWeight: FontWeights.normal,
   },
   finishVotingButton: {
     width: "100%",
